@@ -7,6 +7,10 @@
   </PropertyGroup>
 
   <ItemGroup>
+    <Compile Include="BaseType.fs" />
+    <Compile Include="FrameworkType.fs" />
+    <Compile Include="Screens.fs" />
+    <Compile Include="MainGame.fs" />
     <Compile Include="Program.fs" />
   </ItemGroup>
 
