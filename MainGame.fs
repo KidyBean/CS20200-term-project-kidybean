@@ -43,7 +43,7 @@ type MainGame() as self =
         let loadSpriteBatch = new SpriteBatch(self.GraphicsDevice)
         let loadAssets = {
             fonts = Map [
-                DefaultFont, self.Content.Load<SpriteFont>("DefaultFont")
+                DefaultFont, self.Content.Load<SpriteFont>("font/DefaultFont")
             ]
             textures = Map [
                 BasePixel, new Texture2D(self.GraphicsDevice, 1, 1)

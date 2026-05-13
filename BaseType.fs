@@ -42,7 +42,6 @@ type Direction =
     | R // Right
 
 type KeyBind = 
-    | ButtonInput of int // baseKey: left click
     | Confirm // baseKey: Enter
     | Select // baseKey: Space
     | MoveUp // baseKey: W, up arrow

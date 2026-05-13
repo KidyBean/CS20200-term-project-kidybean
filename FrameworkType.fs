@@ -132,6 +132,7 @@ module UI =
 
     type UIAction = 
         | Moveto of GameScreen
+        | Dummy
 
     type ScreenInteract = {
         buttons: Map<int, UIAction>

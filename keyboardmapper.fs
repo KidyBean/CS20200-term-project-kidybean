@@ -5,5 +5,5 @@ open Microsoft.Xna.Framework.Input
 
 module keyMap = 
     let keyMapping = Map [
-        Keys.Enter
+        Keys.Enter, Confirm
     ]
