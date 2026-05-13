@@ -32,24 +32,24 @@ module ScreenMap =
     let MainMenu: UI.ScreenUI = 
         // title
         let titleText: UI.InnerText = { 
-            UI.font = DefaultFont 
-            UI.content = "Play In Progress"
-            UI.color = Color.White
-            UI.scale = 2.0f
-            UI.pos = UI.AlignPos (UI.CenterX, UI.CenterY)
+            font = DefaultFont 
+            content = "Play In Progress"
+            color = Color.White
+            scale = 3.0f
+            pos = UI.AlignPos (UI.CenterX, UI.CenterY)
         }
         let titleScreen: UI.SubScreen = {
             inner = [UI.Text titleText]
-            pos = Vector2(100.0f, 200.0f)
+            pos = Vector2(100.0f, 100.0f)
             size = Vector2(1080.0f, 200.0f)
         }
         // press enter to start
         let promptText: UI.InnerText = { 
-            UI.font = DefaultFont 
-            UI.content = "Press Enter to Start"
-            UI.color = Color.White
-            UI.scale = 1.0f
-            UI.pos = UI.AlignPos (UI.CenterX, UI.CenterY)
+            font = DefaultFont 
+            content = "Press Enter to Start"
+            color = Color.White
+            scale = 1.0f
+            pos = UI.AlignPos (UI.CenterX, UI.CenterY)
         }
         let promptScreen: UI.SubScreen = {
             inner = [UI.Text promptText]
@@ -65,21 +65,49 @@ module ScreenMap =
     let MainMenuInteract: UI.ScreenInteract = {
         buttons = Map.empty
         keys = Map [
-            Confirm, UI.Moveto (StageSelect 1)
+            Confirm, UI.Moveto (StageSelect 0)
         ]
     }
     /// Stage Select Screen
     let StageSelectBase (v: int) : UI.ScreenUI = 
-        let subscreens = []
+        let patchVerText: UI.InnerText = {
+            font = DefaultFont 
+            content = sprintf "Patch Ver 1.%02d" v
+            color = Color.White
+            scale = 2.0f
+            pos = UI.AlignPos (UI.CenterX, UI.Top)
+        }
+        let DescText: UI.InnerText = {
+            font = DefaultFont 
+            content = "Our First Release"
+            color = Color.White
+            scale = 1.0f
+            pos = UI.AlignPos (UI.CenterX, UI.CenterY)
+        }
+        let promptText: UI.InnerText = {
+            font = DefaultFont 
+            content = "Press Enter"
+            color = Color.White
+            scale = 1.0f
+            pos = UI.AlignPos (UI.CenterX, UI.Bottom)
+        }
+        let levelScreen: UI.SubScreen = {
+            inner = [UI.Text patchVerText; UI.Text DescText; UI.Text promptText]
+            pos = Vector2(100.0f, 100.0f)
+            size = Vector2(1080.0f, 620.0f)
+        }
+
+        let subscreens = [levelScreen]
         let buttons = []
         { buttons = buttons; subscreens = subscreens }
-    let StageSelectInteractBase (v: int) : UI.ScreenInteract = {
-        buttons = Map.empty
-        keys = Map.empty
-    }
+    let StageSelectInteractBase (v: int) : UI.ScreenInteract = 
+        {
+            buttons = Map.empty
+            keys = Map.empty
+        }
     let StageSelectCache: UI.ScreenCache = 
-        let layout = List.map (fun v -> (v, StageSelectBase v)) [1..Core.gameStage + 1] |> Map.ofList
-        let interact = List.map (fun v -> (v, StageSelectInteractBase v)) [1..Core.gameStage + 1] |> Map.ofList
+        let layout = List.map (fun v -> (v, StageSelectBase v)) [0..Core.gameStage] |> Map.ofList
+        let interact = List.map (fun v -> (v, StageSelectInteractBase v)) [0..Core.gameStage] |> Map.ofList
         { layout = layout; interact = interact }
     let StageSelect v = StageSelectCache.layout |> Map.find v
     let StageSelectInteract v = StageSelectCache.interact |> Map.find v
@@ -160,7 +188,6 @@ module Screens =
         | None, Some key when input.keyboard.prevKey <> Some key -> Map.tryFind key interact.keys
         | _, _ -> None
 
-
     /// Get next action from input and gamescreen
     let getNextAction (currentScreen: GameScreen) (input: InputState) =
         match currentScreen with
@@ -174,14 +201,14 @@ module Screens =
     /// Determines the transition type based on the current screen and the next screen
     let getTransition currentScreen nextScreen = 
         match currentScreen with
-        | MainMenu -> Some (Sudden 0.0f, 0.0f)
+        | MainMenu -> Some (Fade, 0.8f) // Some (Sudden 0.0f, 0.0f)
         | StageSelect a ->
             match nextScreen with
-            | StagePlaying -> Some (Fade, 1.0f)
+            | StagePlaying _ -> Some (Fade, 1.0f)
             | StageSelect b when b > a -> Some (Slide L, 0.5f)
             | StageSelect b when b < a -> Some (Slide R, 0.5f)
             | _ -> None
-        | StagePlaying ->
+        | StagePlaying _ ->
             match nextScreen with
             | StageSelect _ -> Some (Fade, 1.0f)
             | _ -> None
@@ -211,13 +238,13 @@ module Screens =
     /// Screens.update -> use for game update.
     let update (currentState: ScreenState) (input: InputState) (deltaTime: float32) =
         match currentState.transition with
-        | Some _ -> (updateTransition currentState deltaTime, None)
+        | Some _ -> (updateTransition currentState deltaTime, Some UI.Blocked)
         | None ->
             match getNextAction currentState.state input with
             | _, Some(UI.Moveto next) -> 
                 match getTransition currentState.state next with
                 | Some (transitionType, transitionDuration) -> 
-                    (updateState currentState next transitionDuration transitionType, None)
+                    (updateState currentState next transitionDuration transitionType, Some UI.Blocked)
                 | None -> (currentState, None)
             | buttonState, action ->
                 let newScreenState = {currentState with buttonState = buttonState}

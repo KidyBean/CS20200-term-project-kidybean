@@ -4,8 +4,8 @@ type GameScreen =
     | MainMenu
     | BlackScreen of float32
     | StageSelect of int
-    | Tutorial
-    | StagePlaying
+    | Tutorial of int
+    | StagePlaying of int
     | PauseMenu
     | GameOver
     | BrokenScreen
@@ -50,6 +50,7 @@ type KeyBind =
     | MoveRight // baseKey: D, right arrow
     | PutDown // baseKey: E, right click
     | Escape // baseKey: Escape
+    | Number of int
 
 type TransitionType = 
     | Slide of Direction
@@ -57,6 +58,5 @@ type TransitionType =
     | Sudden of float32
     | Popup of bool
 
-type GameState = {
-    playerPos: (int * int)
-}
+type GameState = 
+    | Default

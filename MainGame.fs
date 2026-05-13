@@ -56,14 +56,24 @@ type MainGame() as self =
         let mouse = Mouse.GetState()
         let keyboard = Keyboard.GetState()
         let mouseVirtualPos = PosInVirtual viewTransform (Vector2(float32 mouse.X, float32 mouse.Y))
+        let newKey = KeyMap.tryActionFind keyboard
+        let keyInput = { curKey = newKey; prevKey = inputState.keyboard.curKey }
+        let mouseInput = { pos = mouseVirtualPos; prevPos = inputState.mouse.pos; curMouse = mouse; prevMouse = inputState.mouse.curMouse}
+        inputState <- { mouse = mouseInput; keyboard = keyInput }
+        let deltaTime = float32 gameTime.ElapsedGameTime.TotalSeconds
         
-        
+        let newScreen, action = Screens.update screenState inputState deltaTime
+        screenState <- newScreen
+        match action with
+        | Some UI.Blocked -> ()
+        | Some action -> ()
+        | None -> () //for game State change(when game playing)
 
         base.Update(gameTime)
 
     override self.Draw(gameTime) =
         self.GraphicsDevice.Clear(Color.Black)
-        mainContext.spriteBatch.Begin(transformMatrix = viewTransform.transformMatrix)
+        mainContext.spriteBatch.Begin(samplerState = SamplerState.PointClamp, transformMatrix = viewTransform.transformMatrix)
         Screens.draw mainContext screenState playState
         mainContext.spriteBatch.End()
         base.Draw(gameTime)

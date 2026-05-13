@@ -43,7 +43,6 @@ type MouseInput = {
 type KeyboardInput = {
     curKey: KeyBind Option
     prevKey: KeyBind Option
-    holdTime: float32
 }
 
 type InputState = {
@@ -63,13 +62,12 @@ module Core =
         keyboard = {
             curKey = None
             prevKey = None
-            holdTime = 0.0f
         }
     }
     let getFont (context: DrawContext) (fontId: FontID) = context.assets.fonts.[fontId]
     let getTexture (context: DrawContext) (textureId: TextureID) = context.assets.textures.[textureId]
 
-    let gameStage: int = 1
+    let gameStage: int = 20
     let defaultDeltaTime = 0.016f // 60fps - test
 
 
@@ -132,6 +130,7 @@ module UI =
 
     type UIAction = 
         | Moveto of GameScreen
+        | Blocked
         | Dummy
 
     type ScreenInteract = {
