@@ -10,23 +10,21 @@ type MainGame() as self =
     let mutable spriteBatch: SpriteBatch = Unchecked.defaultof<SpriteBatch>
     let mutable assets = Unchecked.defaultof<Assets>
     let mutable screenState = Screens.initialState
+    let mutable inputState = Core.initialInputState
+    let mutable viewTransform = { scale = 1.0f; offset = Vector2.Zero; transformMatrix = Matrix.Identity }
     
     let ScaleTransform () = 
         let viewport = self.GraphicsDevice.Viewport
-        let virtualWidth = 1280.0f
-        let virtualHeight = 720.0f
-
-        let scaleX = float32 viewport.Width/virtualWidth
-        let scaleY = float32 viewport.Height/virtualHeight
-        let fullScale = min scaleX scaleY
-
-        let ScaledWidth = virtualWidth*fullScale
-        let ScaledHeight = virtualHeight*fullScale
-        let offsetX = (float32 viewport.Width - ScaledWidth)/2.0f
-        let offsetY = (float32 viewport.Height - ScaledHeight)/2.0f
-
-        Matrix.CreateScale(fullScale)*Matrix.CreateTranslation(offsetX, offsetY, 0.0f)
-
+        let windowSize = Vector2(float32 viewport.Width, float32 viewport.Height)
+        let scale = min (windowSize.X/Core.virtualScreenSize.X) (windowSize.Y/Core.virtualScreenSize.Y)
+        let offset = (windowSize - Core.virtualScreenSize*scale)*0.5f
+        { 
+            scale = scale
+            offset = offset
+            transformMatrix = Matrix.CreateScale(scale, scale, 1.0f)
+                *Matrix.CreateTranslation(offset.X, offset.Y, 0.0f)
+        }
+    let PosInVirtual (transform: ScreenTransform) (pos: Vector2) = (pos - transform.offset)/transform.scale
     
 
     do
@@ -40,17 +38,21 @@ type MainGame() as self =
     override self.LoadContent() =
         spriteBatch <- new SpriteBatch(self.GraphicsDevice)
         assets <- {
-            fonts = {
-                Default = self.Content.Load<SpriteFont>("Default")
-            }
-            textures = {
-                basePixel = new Texture2D(self.GraphicsDevice, 1, 1)
-            }
+            fonts = Map [
+                DefaultFont, self.Content.Load<SpriteFont>("DefaultFont")
+            ]
+            textures = Map [
+                BasePixel, new Texture2D(self.GraphicsDevice, 1, 1)
+            ]
         }
-        assets.textures.basePixel.SetData([|Color.White|])
+        assets.textures.[BasePixel].SetData([|Color.White|])
     override self.Update(gameTime) =
+        viewTransform <- ScaleTransform()
+        let mouse = Mouse.GetState()
         let keyboard = Keyboard.GetState()
 
+        let mouseVirtualPos = PosInVirtual viewTransform (Vector2(float32 mouse.X, float32 mouse.Y))
+        
         if keyboard.IsKeyDown(Keys.Escape) then
             self.Exit()
 
@@ -58,7 +60,7 @@ type MainGame() as self =
 
     override self.Draw(gameTime) =
         self.GraphicsDevice.Clear(Color.Black)
-        spriteBatch.Begin(transformMatrix = ScaleTransform())
-        // Draw your game objects here
+        spriteBatch.Begin(transformMatrix = viewTransform.transformMatrix)
+        
         spriteBatch.End()
         base.Draw(gameTime)

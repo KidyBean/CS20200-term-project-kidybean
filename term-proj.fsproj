@@ -8,6 +8,7 @@
 
   <ItemGroup>
     <Compile Include="BaseType.fs" />
+    <Compile Include="KeyboardMapper.fs" />
     <Compile Include="FrameworkType.fs" />
     <Compile Include="Screens.fs" />
     <Compile Include="MainGame.fs" />

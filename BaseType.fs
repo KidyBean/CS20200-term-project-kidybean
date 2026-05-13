@@ -2,6 +2,7 @@ namespace TermProj
 
 type GameScreen = 
     | MainMenu
+    | BlackScreen of float32
     | StageSelect of int
     | Tutorial
     | StagePlaying
@@ -41,8 +42,9 @@ type Direction =
     | R // Right
 
 type KeyBind = 
-    | NextScreen // baseKey: Enter
-    | Select // baseKey: Space, left click
+    | ButtonInput of int // baseKey: left click
+    | Confirm // baseKey: Enter
+    | Select // baseKey: Space
     | MoveUp // baseKey: W, up arrow
     | MoveDown // baseKey: S, down arrow
     | MoveLeft // baseKey: A, left arrow
@@ -54,7 +56,6 @@ type TransitionType =
     | Slide of Direction
     | Fade
     | Sudden of float32
-    | Playing
     | Popup of bool
 
 type GameState = {
