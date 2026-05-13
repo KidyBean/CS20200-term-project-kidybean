@@ -7,11 +7,15 @@ open Microsoft.Xna.Framework.Input
 type MainGame() as self =
     inherit Game()
     let graphic = new GraphicsDeviceManager(self)
-    let mutable spriteBatch: SpriteBatch = Unchecked.defaultof<SpriteBatch>
-    let mutable assets = Unchecked.defaultof<Assets>
-    let mutable screenState = Screens.initialState
-    let mutable inputState = Core.initialInputState
+    let mutable mainContext: DrawContext  = {
+        spriteBatch = Unchecked.defaultof<SpriteBatch>
+        assets = Unchecked.defaultof<Assets>
+    }
     let mutable viewTransform = { scale = 1.0f; offset = Vector2.Zero; transformMatrix = Matrix.Identity }
+
+    let mutable screenState = Screens.initialState
+    let mutable playState = None
+    let mutable inputState = Core.initialInputState
     
     let ScaleTransform () = 
         let viewport = self.GraphicsDevice.Viewport
@@ -36,8 +40,8 @@ type MainGame() as self =
         base.Initialize()
 
     override self.LoadContent() =
-        spriteBatch <- new SpriteBatch(self.GraphicsDevice)
-        assets <- {
+        let loadSpriteBatch = new SpriteBatch(self.GraphicsDevice)
+        let loadAssets = {
             fonts = Map [
                 DefaultFont, self.Content.Load<SpriteFont>("DefaultFont")
             ]
@@ -45,22 +49,21 @@ type MainGame() as self =
                 BasePixel, new Texture2D(self.GraphicsDevice, 1, 1)
             ]
         }
-        assets.textures.[BasePixel].SetData([|Color.White|])
+        loadAssets.textures.[BasePixel].SetData([|Color.White|])
+        mainContext <- { spriteBatch = loadSpriteBatch; assets = loadAssets }
     override self.Update(gameTime) =
         viewTransform <- ScaleTransform()
         let mouse = Mouse.GetState()
         let keyboard = Keyboard.GetState()
-
         let mouseVirtualPos = PosInVirtual viewTransform (Vector2(float32 mouse.X, float32 mouse.Y))
         
-        if keyboard.IsKeyDown(Keys.Escape) then
-            self.Exit()
+        
 
         base.Update(gameTime)
 
     override self.Draw(gameTime) =
         self.GraphicsDevice.Clear(Color.Black)
-        spriteBatch.Begin(transformMatrix = viewTransform.transformMatrix)
-        
-        spriteBatch.End()
+        mainContext.spriteBatch.Begin(transformMatrix = viewTransform.transformMatrix)
+        Screens.draw mainContext screenState playState
+        mainContext.spriteBatch.End()
         base.Draw(gameTime)
