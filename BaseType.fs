@@ -23,16 +23,17 @@ type StageState =
     | Blocked
 
 type ObjectType = 
+    | Empty
     | Player
     | Flag
     | Wall
-    | Door
-    | Box
-    | Key
     | Spike
-    | Empty
+    | Box
+    | Door of int
+    | Key of int
 
 type GroundType = 
+    | AbyssGround // base terrain
     | Ground
     | Abyss // Empty Space
     | ObjectGround of ObjectType // Abyss filled with an object
@@ -59,6 +60,3 @@ type TransitionType =
     | Fade
     | Sudden of float32
     | Popup of bool
-
-type GameState = 
-    | Default

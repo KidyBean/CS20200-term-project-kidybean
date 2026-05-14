@@ -11,6 +11,7 @@
     <Compile Include="FrameworkType.fs" />
     <Compile Include="KeyboardMap.fs" />
     <Compile Include="StageBase.fs" />
+    <Compile Include="StagePlaying.fs" />
     <Compile Include="GameState.fs" />
     <Compile Include="Screens.fs" />
     <Compile Include="MainGame.fs" />

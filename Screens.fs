@@ -27,6 +27,7 @@ module InteractUI =
             | _ -> None
         else None
 
+
 module ScreenMap = 
     /// Main Menu Screen ---------------------------------------------------------------------
     let MainMenu: UI.ScreenUI = 
@@ -68,7 +69,7 @@ module ScreenMap =
             Confirm, UI.Moveto (StageSelect 0)
         ]
     }
-    /// Stage Select Screen
+    /// Stage Select Screen ----------------------------------------------------------------
     let StageSelectBase (v: int) : UI.ScreenUI = 
         let patchVerText: UI.InnerText = {
             font = DefaultFont 
@@ -112,6 +113,10 @@ module ScreenMap =
     let StageSelect v = StageSelectCache.layout |> Map.find v
     let StageSelectInteract v = StageSelectCache.interact |> Map.find v
 
+
+
+
+
 module DrawUI = 
     /// draw text with font.
     let drawText (spriteBatch: SpriteBatch) (font: SpriteFont) (text: string) (pos: Vector2) (color: Color) (scale: float32) =
@@ -120,6 +125,8 @@ module DrawUI =
     let drawTexture (spriteBatch: SpriteBatch) (texture: Texture2D) (pos: Vector2) (size: Vector2) (color: Color) =
         let scale = Vector2(size.X/(float32 texture.Width), size.Y/(float32 texture.Height))
         spriteBatch.Draw(texture, pos, System.Nullable<Rectangle>(), color, 0.0f, Vector2.Zero, scale, SpriteEffects.None, 0.0f)
+    
+    
     /// draw sub screen in main screen. Offset is for transition
     let subScreenDraw (context: DrawContext) (subScreen: UI.SubScreen) (offset: Vector2) (colorscale: float32) =
         subScreen.inner |> List.iter (function
@@ -144,6 +151,8 @@ module DrawUI =
             match button.pressedLayout with
             | Some layout -> subScreenDraw context layout offset 1.0f
             | None -> subScreenDraw context button.normalLayout offset 0.3f
+    
+    
     // for scene test
     let drawBlackScreen (context: DrawContext) (opacity: float32) (offset: Vector2) =
         let black = GameCore.getTexture context TextureID.BasePixel
@@ -159,6 +168,9 @@ module DrawUI =
                 let state = if button.Id = buttonId then state else UI.Normal
                 buttonDraw context button state offset
             )
+
+
+
 
 module Screens = 
     type Transition = {
