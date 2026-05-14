@@ -23,12 +23,19 @@ module PatchMap =
         patchMap
         |> Map.add bug true
 
-type StageObjectGrid = ObjectType[,,]
-type StageGroundGrid = GroundType[,]
 type StageGrid = {
     objectLayer: int
-    objects: StageObjectGrid
-    ground: StageGroundGrid
+    width: int
+    height: int
+    objects: ObjectType[,,]
+    ground: GroundType[,]
+}
+
+type CompactGrid = {
+    width: int
+    height: int
+    objects: ObjectType[,]
+    ground: GroundType[,]
 }
 
 type GridPosition = { X: int; Y: int }
@@ -47,6 +54,8 @@ module StageGrid =
         let newGroundGrid = Array2D.create width height Abyss
         {
             objectLayer = GameCore.objectLayer
+            width = width
+            height = height
             objects = newObjectGrid
             ground = newGroundGrid
         }
