@@ -15,11 +15,12 @@ type GameScreen =
     | CustomScreen of string
     | NoScreen
 
-type StageResult = 
+type StageState = 
     | Normal
     | Crash
     | Exploit
     | Defeat
+    | Blocked
 
 type ObjectType = 
     | Player
@@ -29,6 +30,7 @@ type ObjectType =
     | Box
     | Key
     | Spike
+    | Empty
 
 type GroundType = 
     | Ground

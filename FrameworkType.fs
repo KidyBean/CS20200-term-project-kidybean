@@ -50,7 +50,7 @@ type InputState = {
     keyboard: KeyboardInput
 }
 
-module Core = 
+module GameCore = 
     let virtualScreenSize = Vector2(1280.0f, 720.0f)
     let initialInputState = {
         mouse = {
@@ -68,6 +68,7 @@ module Core =
     let getTexture (context: DrawContext) (textureId: TextureID) = context.assets.textures.[textureId]
 
     let gameStage: int = 20
+    let objectLayer: int = 5
     let defaultDeltaTime = 0.016f // 60fps - test
 
 

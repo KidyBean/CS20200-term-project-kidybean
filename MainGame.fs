@@ -15,13 +15,13 @@ type MainGame() as self =
 
     let mutable screenState = Screens.initialState
     let mutable playState = None
-    let mutable inputState = Core.initialInputState
+    let mutable inputState = GameCore.initialInputState
     
     let ScaleTransform () = 
         let viewport = self.GraphicsDevice.Viewport
         let windowSize = Vector2(float32 viewport.Width, float32 viewport.Height)
-        let scale = min (windowSize.X/Core.virtualScreenSize.X) (windowSize.Y/Core.virtualScreenSize.Y)
-        let offset = (windowSize - Core.virtualScreenSize*scale)*0.5f
+        let scale = min (windowSize.X/GameCore.virtualScreenSize.X) (windowSize.Y/GameCore.virtualScreenSize.Y)
+        let offset = (windowSize - GameCore.virtualScreenSize*scale)*0.5f
         { 
             scale = scale
             offset = offset

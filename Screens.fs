@@ -106,8 +106,8 @@ module ScreenMap =
             keys = Map.empty
         }
     let StageSelectCache: UI.ScreenCache = 
-        let layout = List.map (fun v -> (v, StageSelectBase v)) [0..Core.gameStage] |> Map.ofList
-        let interact = List.map (fun v -> (v, StageSelectInteractBase v)) [0..Core.gameStage] |> Map.ofList
+        let layout = List.map (fun v -> (v, StageSelectBase v)) [0..GameCore.gameStage] |> Map.ofList
+        let interact = List.map (fun v -> (v, StageSelectInteractBase v)) [0..GameCore.gameStage] |> Map.ofList
         { layout = layout; interact = interact }
     let StageSelect v = StageSelectCache.layout |> Map.find v
     let StageSelectInteract v = StageSelectCache.interact |> Map.find v
@@ -124,13 +124,13 @@ module DrawUI =
     let subScreenDraw (context: DrawContext) (subScreen: UI.SubScreen) (offset: Vector2) (colorscale: float32) =
         subScreen.inner |> List.iter (function
             | UI.Text innertext ->
-                let font = Core.getFont context innertext.font
+                let font = GameCore.getFont context innertext.font
                 let textSize = font.MeasureString(innertext.content)*innertext.scale
                 let realpos = UI.getRealPos innertext.pos textSize subScreen
                 drawText context.spriteBatch font innertext.content (realpos + offset) (Color.Multiply(innertext.color, colorscale)) innertext.scale
             | UI.Texture innertexture -> 
                 let realpos = UI.getRealPos innertexture.pos innertexture.size subScreen
-                drawTexture context.spriteBatch (Core.getTexture context innertexture.texture) (realpos + offset) innertexture.size (Color.Multiply(innertexture.color, colorscale))
+                drawTexture context.spriteBatch (GameCore.getTexture context innertexture.texture) (realpos + offset) innertexture.size (Color.Multiply(innertexture.color, colorscale))
         )
     /// draw button with button state.
     let buttonDraw (context: DrawContext) (button: UI.ButtonInfo) (state: UI.ButtonCurrent) (offset: Vector2) =
@@ -146,7 +146,7 @@ module DrawUI =
             | None -> subScreenDraw context button.normalLayout offset 0.3f
     // for scene test
     let drawBlackScreen (context: DrawContext) (opacity: float32) (offset: Vector2) =
-        let black = Core.getTexture context TextureID.BasePixel
+        let black = GameCore.getTexture context TextureID.BasePixel
         let color = Color(0.0f, 0.0f, 0.0f, opacity)
         drawTexture context.spriteBatch black offset  (Vector2(1280.0f, 720.0f)) color
     // Draw from ScreenMap
@@ -266,8 +266,8 @@ module Screens =
         match screenState.transition with
         | Some transition -> 
             let progress = transition.currentTime / transition.duration
-            let distancex = Core.virtualScreenSize.X
-            let distancey = Core.virtualScreenSize.Y
+            let distancex = GameCore.virtualScreenSize.X
+            let distancey = GameCore.virtualScreenSize.Y
             match transition.transitionType with
             | Slide dir ->
                 let offset, oppoOffset = 
