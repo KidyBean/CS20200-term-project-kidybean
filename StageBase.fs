@@ -4,15 +4,21 @@ open Microsoft.Xna.Framework
 
 type BugPatch = 
     | NoBug
-    | PlayerCollision
-    | BlockCollision
-    | AbyssCheck
-    | WrongAbyssObject
-    | ObjectLayerStack
-    | WrongInventoryPut
-    | InventoryLayerStack
-    | PutDownOverlap
-
+    // Initial bug
+    | PlayerCollisionExploit // Exploit
+    | StagePositionOutCrash // Crashed
+    // Block Push Update
+    | WrongObjectPushExploit // Exploit
+    | ObjectCollisionExploit // Exploit
+    // Ground Update
+    | AbyssCheckExploit // Exploit
+    | WrongAbyssObjectExploit // Exploit
+    // Inventory Update
+    | WrongInventoryPutExploit // Exploit
+    | InventoryLayerStackCrash // Crash
+    | PutDownOverlapExploit // Exploit
+    // KeyAndDoorUpdate
+    | AnyKeyUsedExploit // Exploit
 
 type Update = 
     | Walk
@@ -23,21 +29,17 @@ type Update =
 
 
 type PatchMap = Set<BugPatch>
-type UpdateMap = Set<Update>
-
-type GameUpdate = {
-    patchList: PatchMap
-    updateList: UpdateMap
-}
 
 module GameUpdate = 
-    let private _isPatched (bug: BugPatch) (patchMap: PatchMap) = patchMap |> Set.contains bug
-    let private _newPatch (bug: BugPatch) (patchMap: PatchMap) = patchMap |> Set.add bug 
-    let isPatched (bug: BugPatch) (update: GameUpdate) = _isPatched bug update.patchList
-    let newPatch (bug: BugPatch) (update: GameUpdate) = _newPatch bug update.patchList
+    let isPatched (bug: BugPatch) (patchMap: PatchMap) = patchMap |> Set.contains bug
+    let newPatch (bug: BugPatch) (patchMap: PatchMap) = patchMap |> Set.add bug 
 
 
-type GridPosition = { X: int; Y: int }
+type GridPosition = { X: int; Y: int } with
+    static member (+) (a: GridPosition, b: GridPosition) =
+        { X = a.X + b.X; Y = a.Y + b.Y }
+    static member (-) (a: GridPosition, b: GridPosition) =
+        { X = a.X - b.X; Y = a.Y - b.Y }
 
 type StageGrid = {
     objectLayer: int
@@ -51,7 +53,6 @@ type CompactGrid = {
     width: int
     height: int
     startPos: GridPosition
-    goalPos: GridPosition list
     objects: ObjectType[,]
     ground: GroundType[,]
 }
@@ -67,8 +68,14 @@ module StageGrid =
     let gridPosToVector (pos: GridPosition) = 
         Vector2(float32 pos.X, float32 pos.Y)
     
+    let directionToGrid = function
+        | U -> { X = 0; Y = -1 }
+        | D -> { X = 0; Y = 1 }
+        | L -> { X = -1; Y = 0 }
+        | R -> { X = 1; Y = 0 }
+    
     let newGrid (width: int) (height: int) : StageGrid = 
-        let newObjectGrid = Array3D.create GameCore.objectLayer width height Empty
+        let newObjectGrid = Array3D.create (GameCore.objectLayer + 1) width height Empty
         let newGroundGrid = Array2D.create width height Abyss
         {
             objectLayer = GameCore.objectLayer
@@ -78,17 +85,50 @@ module StageGrid =
             ground = newGroundGrid
         }
     
+    let isPosOutOfStage (pos: GridPosition) (stage: StageGrid) = 
+        let outWidth = pos.X < 0 || pos.X >= stage.width
+        let outHeight = pos.Y < 0 || pos.Y >= stage.height
+        outWidth || outHeight
+    
     let objectOnPos (pos: GridPosition) (stage: StageGrid) = 
-        let layer = stage.objectLayer
+        let layer = stage.objectLayer + 1
         let objectArr = Array.create layer Empty
-        for l in 0..layer - 1 do
+        for l in 0..layer do
             let object = stage.objects[l, pos.X, pos.Y]
             objectArr[l] <- object
         objectArr
+    
     let groundOnPos (pos: GridPosition) (stage: StageGrid) = stage.ground[pos.X, pos.Y]
 
     let putObject (object: ObjectType) (layer: int) (pos: GridPosition) (stage: StageGrid) = 
         stage.objects[layer, pos.X, pos.Y] <- object
+    
+    let pushObjects (rawObject: ObjectType[]) (pos: GridPosition) (stage: StageGrid) (isBaseRemain: bool) = 
+        let objects = rawObject |> Array.filter (fun x -> x <> Empty)
+        let numObjects = Array.length objects
+        if numObjects > 0 then
+            if isBaseRemain then
+                let rawOffset = numObjects - GameCore.objectLayer - 1
+                let offset = if rawOffset > 0 then rawOffset else 0
+                putObject objects[0] 0 pos stage
+                for idx in 1..GameCore.objectLayer do
+                    if idx < numObjects - offset then
+                        putObject objects[idx + offset] idx pos stage
+                    else
+                        putObject Empty idx pos stage
+            else
+                let rawOffset = numObjects - GameCore.objectLayer
+                let offset = if rawOffset > 0 then rawOffset else 0
+                for idx in 0..GameCore.objectLayer - 1 do
+                    if idx < numObjects - offset then
+                        putObject objects[idx + offset] idx pos stage
+                    else
+                        putObject Empty idx pos stage
+        
+    let putObjectToGround (object: ObjectType) (pos: GridPosition) (stage: StageGrid) = 
+        match object with
+        | Empty -> stage.ground[pos.X, pos.Y] <- Abyss
+        | _ -> stage.ground[pos.X, pos.Y] <- ObjectGround object
 
     let makeStageGrid (compactMap: CompactGrid) = 
         let stageGrid = newGrid (compactMap.width + 2*GameCore.GridPadding) (compactMap.height + 2*GameCore.GridPadding)
@@ -97,10 +137,9 @@ module StageGrid =
                 stageGrid.objects[0, x + GameCore.GridPadding, y + GameCore.GridPadding] <- compactMap.objects[x, y]
                 stageGrid.ground[x + GameCore.GridPadding, y + GameCore.GridPadding] <- compactMap.ground[x, y]
         let startPos = { X = compactMap.startPos.X + GameCore.GridPadding; Y = compactMap.startPos.Y + GameCore.GridPadding}
-        let goalPos = 
-            compactMap.goalPos
-            |> List.map (fun pos -> { X = pos.X + GameCore.GridPadding; Y = pos.Y + GameCore.GridPadding})
-        stageGrid, startPos, goalPos
+        stageGrid, startPos
+
+
 
 module StageParser = 
     let objectMap = Map [
@@ -118,22 +157,21 @@ module StageParser =
         "D2", Door 2
     ]
 
-    let stringToObject (tocken: string) (isNoGround: bool) =
+    let stringToObject (token: string) (isNoGround: bool) =
         let abyss = if isNoGround then AbyssGround else Abyss
         let ground = if isNoGround then AbyssGround else Ground
-        let gridCell = objectMap |> Map.tryFind tocken
+        let gridCell = objectMap |> Map.tryFind token
         match gridCell with
         | Some object -> object, ground
         | None -> Empty, abyss
     
     let makeCompactStage (csvString: string) (isNoGround: bool) = 
         let tockenArr = 
-            csvString.Split('\n')
+            csvString.Split('\n') 
             |> Array.map (fun row -> row.TrimEnd('\r'))
             |> Array.filter (fun row -> row.Length > 0)
             |> Array.map (fun row  -> 
-                row.Split(',') 
-                |> Array.map(fun tocken -> tocken.Trim()))
+                row.Split(',') |> Array.map(fun tocken -> tocken.Trim()))
         
         let height = tockenArr.Length
         let width = 
@@ -145,7 +183,6 @@ module StageParser =
         let objectMap = Array2D.create width height Empty
         let groundMap = Array2D.create width height abyss
         let mutable startPos = { X = 0; Y = 0 }
-        let mutable goalPos = []
 
         for y in 0..height - 1 do
             for x in 0..tockenArr[y].Length - 1 do
@@ -154,14 +191,12 @@ module StageParser =
                 groundMap[x, y] <- ground
                 match object with
                 | Player -> startPos <- { X = x; Y = y }
-                | Flag -> goalPos <- { X = x; Y = y } :: goalPos
                 | _ -> ()
         
         {
             width = width
             height = height
             startPos = startPos
-            goalPos = goalPos
             objects = objectMap
             ground = groundMap
         }

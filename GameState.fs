@@ -19,11 +19,11 @@ module GS =
         flagListtoList [] flagList
 
     let howMapVictory (stagenum: int) (victoryMap: StageVictoryMap) = 
-        if stagenum < 0 || stagenum > GameCore.gameStage then [Blocked]
+        if stagenum < 0 || stagenum > GameCore.gameStage then [StageBlocked]
         else
             let prevFlag = victoryMap |> Map.tryFind (stagenum - 1)
             match prevFlag with
-            | Some (n, c, e) when n || c || e -> [Blocked]
+            | Some (n, c, e) when n || c || e -> [StageBlocked]
             | _ ->
                 let stageFlag = victoryMap |> Map.find stagenum
                 let stateList = getFlagToList stageFlag
@@ -44,9 +44,18 @@ module GS =
 
 type GameState = {
     stageResult: GS.StageVictoryMap
+    lastPatchList: PatchMap
+    lastSelectedStage: int
+    inStage: InStage option
 }
 
 module GameState =
+    let initialGameState = {
+        stageResult = Map.empty
+        lastPatchList = Set.empty
+        lastSelectedStage = 0
+        inStage = None
+    }
     let howMapVictory (stagenum: int) (gameState: GameState) = GS.howMapVictory stagenum gameState.stageResult
     let addStageFlag (stagenum: int) (stageState: StageState) (gameState: GameState) = 
         match (GS.addStageFlag stagenum stageState gameState.stageResult) with

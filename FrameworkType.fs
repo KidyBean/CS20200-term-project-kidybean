@@ -68,8 +68,10 @@ module GameCore =
     let getTexture (context: DrawContext) (textureId: TextureID) = context.assets.textures.[textureId]
 
     let gameStage: int = 20
-    let objectLayer: int = 2
+    let objectLayer: int = 3
     let GridPadding: int = 4
+    let InventoryStack: int = 4
+    let ActionDelay: float32 = 0.5f
     let defaultDeltaTime = 0.016f // 60fps - test
 
 

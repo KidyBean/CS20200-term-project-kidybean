@@ -20,7 +20,7 @@ type StageState =
     | Crash
     | Exploit
     | Defeat
-    | Blocked
+    | StageBlocked
 
 type ObjectType = 
     | Empty
@@ -46,13 +46,11 @@ type Direction =
 
 type KeyBind = 
     | Confirm // baseKey: Enter
-    | Select // baseKey: Space
-    | MoveUp // baseKey: W, up arrow
-    | MoveDown // baseKey: S, down arrow
-    | MoveLeft // baseKey: A, left arrow
-    | MoveRight // baseKey: D, right arrow
-    | PutDown // baseKey: E, right click
+    | Move of Direction // baseKey: WASD, Direction arrow
+    | GetObject // baseKey: E
+    | PutDown // baseKey: F
     | Escape // baseKey: Escape
+    | Reset // baseKey: R
     | Number of int
 
 type TransitionType = 

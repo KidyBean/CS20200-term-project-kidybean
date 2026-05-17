@@ -266,7 +266,7 @@ module Screens =
 
 
     /// Draws the current screen with offset for transition
-    let drawScreen (context: DrawContext) (screen: GameScreen) (buttonState: (int * UI.ButtonCurrent) option) (playState: GameState option) (offset: Vector2) =
+    let drawScreen (context: DrawContext) (screen: GameScreen) (buttonState: (int * UI.ButtonCurrent) option) (playState: GameState) (offset: Vector2) =
         match screen with
         | BlackScreen v -> DrawUI.drawBlackScreen context v offset
         | MainMenu -> DrawUI.screenDraw context ScreenMap.MainMenu buttonState offset
@@ -274,7 +274,7 @@ module Screens =
         | _ -> DrawUI.drawBlackScreen context 1.0f offset
 
     /// Draws the current screen and the transition effect if there is a transition
-    let draw (context: DrawContext) (screenState: ScreenState) (playState: GameState option) =
+    let draw (context: DrawContext) (screenState: ScreenState) (playState: GameState) =
         match screenState.transition with
         | Some transition -> 
             let progress = transition.currentTime / transition.duration

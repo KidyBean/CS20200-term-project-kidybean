@@ -14,7 +14,7 @@ type MainGame() as self =
     let mutable viewTransform = { scale = 1.0f; offset = Vector2.Zero; transformMatrix = Matrix.Identity }
 
     let mutable screenState = Screens.initialState
-    let mutable playState = None
+    let mutable playState = GameState.initialGameState
     let mutable inputState = GameCore.initialInputState
     
     let ScaleTransform () = 
