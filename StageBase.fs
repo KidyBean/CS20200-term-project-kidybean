@@ -57,12 +57,12 @@ type CompactGrid = {
     ground: GroundType[,]
 }
 
-
-
 module StageGrid = 
     let tupleToGridPos (pos: int*int) = 
         let x, y = pos
         { X = x; Y = y }
+    let vectorToGridPos (pos: Vector2) = 
+        { X = int pos.X; Y = int pos.Y }
     let gridPosToTuple (pos: GridPosition) = 
         (pos.X, pos.Y)
     let gridPosToVector (pos: GridPosition) = 

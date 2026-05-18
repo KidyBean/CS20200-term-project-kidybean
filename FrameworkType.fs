@@ -69,7 +69,7 @@ module GameCore =
 
     let gameStage: int = 20
     let objectLayer: int = 3
-    let GridPadding: int = 4
+    let GridPadding: int = 20
     let InventoryStack: int = 4
     let ActionDelay: float32 = 0.5f
     let defaultDeltaTime = 0.016f // 60fps - test

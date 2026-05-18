@@ -15,7 +15,11 @@ type GameMove =
 type InStage = {
     patch: PatchMap
     playerPos: GridPosition
+    prevPlayerPos: GridPosition
+    playerRealPos: Vector2
     playerDirection: Direction
+    cameraTarget: Vector2
+    cameraPos: Vector2
     stageMap: StageGrid
     inventoryFlag: bool
     inventory: ObjectType[]
@@ -388,6 +392,29 @@ module StageInteraction =
             | Some (idx, v) -> interactMap v (objectPos, idx) stage
 
 
+module StageCore = 
+    let BlockSize = 40
+    let DamperSizefromCenter = { 
+        X = (int GameCore.virtualScreenSize.X)/(2*BlockSize) + GameCore.GridPadding/2; 
+        Y = (int GameCore.virtualScreenSize.Y)/(2*BlockSize) + GameCore.GridPadding/2
+    }
+    let ScreenSizefromCenter = { 
+        X = (int GameCore.virtualScreenSize.X)/(2*BlockSize) + 2; 
+        Y = (int GameCore.virtualScreenSize.Y)/(2*BlockSize) + 2 
+    }
+
+    let IsPosinScreen (realPos: Vector2) (center: GridPosition) = 
+        let pos = StageGrid.vectorToGridPos realPos
+        let minScreen = center - ScreenSizefromCenter
+        let maxScreen = center + ScreenSizefromCenter
+        pos.X >= minScreen.X && pos.X <= maxScreen.X && pos.Y >= minScreen.Y && pos.Y <= maxScreen.Y
+    
+    let centerinStartPos (pos: GridPosition) (map: StageGrid) = 
+        let maxX = map.width
+        let maxY = map.height
+        let centerX = if pos.X - DamperSizefromCenter.X > 0 &&
+
+
 module InStage = 
     let newStage (map: CompactGrid) (patchMap: PatchMap) (inventoryFlag: bool) = 
         let stageGrid, playerPos = StageGrid.makeStageGrid map
@@ -395,6 +422,10 @@ module InStage =
         {
             patch = patchMap
             playerPos = playerPos
+            prevPlayerPos = playerPos
+            playerRealPos = StageGrid.gridPosToVector playerPos
+            cameraTarget = 
+            cameraPos = 
             playerDirection = Direction.R
             stageMap = stageGrid
             inventoryFlag = inventoryFlag
@@ -413,12 +444,22 @@ module InStage =
     
     let update (action: KeyBind) (stage: InStage) (deltaTime: float32) = 
         match stage.moveTime with
-        | Some _ -> 
+        | Some movetime -> 
             let nextTime = stage.moveTimeSpent - deltaTime
             if nextTime > 0.0f then
-                { stage with moveTimeSpent = nextTime; fullTimeSpent = stage.fullTimeSpent + deltaTime }
+                { stage with 
+                    
+                    moveTimeSpent = nextTime; 
+                    fullTimeSpent = stage.fullTimeSpent + deltaTime 
+                }
             else
-                { stage with movement = [(Minor, 0.0f)]; moveTime = None; moveTimeSpent = 0.0f; fullTimeSpent = stage.fullTimeSpent + deltaTime }
+                { stage with 
+                    prevPlayerPos = stage.playerPos;
+                    movement = [(Minor, 0.0f)]; 
+                    moveTime = None; 
+                    moveTimeSpent = 0.0f; 
+                    fullTimeSpent = stage.fullTimeSpent + deltaTime 
+                }
         | None ->
             let playerResult = StagePlayer.playerResult stage
             match playerResult with
@@ -431,3 +472,6 @@ module InStage =
                 | PutDown -> stage
                 | _ -> { stage with fullTimeSpent = stage.fullTimeSpent + deltaTime }
             | _ -> failwith "Game Real Crashed with Unexpected State in PlayerResult. This Cannot Happen Because of PlayerResult Definition."
+
+
+
