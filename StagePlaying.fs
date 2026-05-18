@@ -6,6 +6,7 @@ open Microsoft.Xna.Framework
 type GameMove = 
     | ObjectMove of ObjectType[]*GridPosition*GridPosition // object from to
     | Minor
+    | NoAction
     | StageVictory
     | PlayerDead
     | StageCrashed of BugPatch
@@ -25,7 +26,7 @@ type InStage = {
     inventory: ObjectType[]
     selectedIdx: int
     usedBug: BugPatch Set
-    movement: (GameMove*float32) list
+    movement: (GameMove list*float32)
     moveTime: float32 option
     moveTimeSpent: float32
     fullTimeSpent: float32
@@ -81,15 +82,15 @@ module StageObject =
         
         let result =
             if not canMoveTarget then Blocked
-            elif targetObject = Empty then Passed (Set [NoBug], Empty)
+            elif targetObject = Empty then Passed (Set.empty, Empty)
             elif StageGrid.isPosOutOfStage next stage.stageMap then 
                 if Set.contains StagePositionOutCrash patchList then CrashRaised StagePositionOutCrash
                 else Blocked
-            else Passed (Set [NoBug], targetObject)
+            else Passed (Set.empty, targetObject)
         match result with
         | CrashRaised err -> CrashRaised err
         | Blocked -> Blocked
-        | Passed (_, Empty) -> Passed (Set [NoBug], [||])
+        | Passed (_, Empty) -> Passed (Set.empty, [||])
         | _ ->
             let posObjects = stageMap |> StageGrid.objectOnPos next
             let posIdx, posRemain = if Option.isSome ((|CanGoThrough|_|) posObjects[0]) then 1, true else 0, false
@@ -98,7 +99,7 @@ module StageObject =
             match posObjects[posIdx], targetObject with
             | Empty, Player | Empty, CanPush -> 
                 StageGrid.pushObjects [|pushBackObject|] prev stage.stageMap false
-                Passed (Set [NoBug], movableObject)
+                Passed (Set.empty, movableObject)
         
             | _, Player when not (Set.contains PlayerCollisionExploit patchList) -> 
                 StageGrid.pushObjects [|pushBackObject|] prev stage.stageMap false
@@ -139,14 +140,14 @@ module StageObject =
                     let ground = targetObjects[v]
                     StageGrid.pushObjects remain pos stage.stageMap false
                     StageGrid.putObjectToGround ground pos stage.stageMap
-                    Passed (Set [NoBug], ())
+                    Passed (Set.empty, ())
                 | None ->
                     StageGrid.pushObjects [|Empty|] pos stage.stageMap false
-                    Passed (Set [NoBug], ())
+                    Passed (Set.empty, ())
             else
                 let remain = targetObjects[1..]
                 let ground = targetObjects[0]
-                if ground = Empty then Passed (Set[NoBug], ())
+                if ground = Empty then Passed (Set.empty, ())
                 else
                     StageGrid.pushObjects remain pos stage.stageMap false
                     StageGrid.putObjectToGround ground pos stage.stageMap
@@ -166,7 +167,7 @@ module StageObject =
                 match object with
                 | CanPutInventory ->
                     StageGrid.putObjectToGround Empty pos stageMap
-                    Passed (Set [NoBug], object)
+                    Passed (Set.empty, object)
                 | _ ->
                     if Set.contains WrongInventoryPutExploit patchMap then Blocked
                     else 
@@ -179,10 +180,10 @@ module StageObject =
             | CanPutInventory -> 
                 if v - 1 > 0 then
                     StageGrid.pushObjects targetObjects[..v - 2] pos stageMap false
-                    Passed (Set [NoBug], object)
+                    Passed (Set.empty, object)
                 else
                     StageGrid.pushObjects [|Empty|] pos stageMap false
-                    Passed (Set [NoBug], object)
+                    Passed (Set.empty, object)
             | _ ->
                 if Set.contains WrongInventoryPutExploit patchMap then Blocked
                 else 
@@ -197,7 +198,7 @@ module StageObject =
             match object with
             | CanPutInventory -> 
                 StageGrid.pushObjects targetObjects[..GameCore.objectLayer - 1] pos stageMap true
-                Passed (Set [NoBug], object)
+                Passed (Set.empty, object)
             | _ ->
                 if Set.contains WrongInventoryPutExploit patchMap then Blocked
                 else 
@@ -219,7 +220,7 @@ module StageObject =
                     match object with
                     | CanFillAbyss -> 
                         StageGrid.putObjectToGround object pos stageMap
-                        Passed (Set [NoBug], ())
+                        Passed (Set.empty, ())
                     | _ -> 
                         if Set.contains WrongAbyssObjectExploit patchMap then Blocked
                         else
@@ -227,10 +228,10 @@ module StageObject =
                             Passed (Set [WrongAbyssObjectExploit], ())
                 | ObjectGround _ | Ground | AbyssGround -> 
                     StageGrid.pushObjects [|object|] pos stageMap false
-                    Passed (Set [NoBug], ())
+                    Passed (Set.empty, ())
             | Some 1 when Option.isSome ((|CanGoThrough|_|)targetObjects[0]) ->
                 StageGrid.pushObjects [|object|] pos stageMap true
-                Passed (Set [NoBug], ())
+                Passed (Set.empty, ())
             | _ ->
                 let isBaseRemain = Option.isSome ((|CanGoThrough|_|)targetObjects[0])
                 StageGrid.pushObjects [|object|] pos stageMap isBaseRemain
@@ -245,16 +246,16 @@ module StagePlayer =
         let ground = StageGrid.groundOnPos playerPos stage.stageMap
         let abyssResult, exploit = 
             match ground, Set.contains AbyssCheckExploit patchMap with
-            | Abyss, true -> Dead, NoBug
-            | Abyss, false -> Alive, AbyssCheckExploit
-            | _, _ -> Alive, NoBug
+            | Abyss, true -> Dead, Set.empty
+            | Abyss, false -> Alive, Set [AbyssCheckExploit]
+            | _, _ -> Alive, Set.empty
         if abyssResult = Dead then
-            Passed (Set [exploit], Dead)
+            Passed (exploit, Dead)
         else
             match baseObject with
-            | StageObject.CanMakePlayerDead -> Passed (Set [exploit], Dead)
-            | StageObject.CanMakePlayerGoal -> Passed (Set [exploit], Victory)
-            | _ -> Passed (Set [exploit], Alive)
+            | StageObject.CanMakePlayerDead -> Passed (exploit, Dead)
+            | StageObject.CanMakePlayerGoal -> Passed (exploit, Victory)
+            | _ -> Passed (exploit, Alive)
         
     let playerMove (direction: Direction) (stage: InStage) = 
         let playerPos = stage.playerPos
@@ -275,7 +276,11 @@ module StagePlayer =
                         Passed (err2, [ObjectMove (objectList2, playerPos, objectPos)])
                     else
                         Passed (Set.union err2 err, [ObjectMove (objectList2, playerPos, objectPos); ObjectMove (objectList, objectPos, objectAfterPos)])
-                | Blocked -> Blocked
+                | Blocked ->
+                    if Array.isEmpty objectList then
+                        Blocked
+                    else
+                        Passed (err, [ObjectMove ([||], playerPos, playerPos); ObjectMove (objectList, objectPos, objectAfterPos)])
                 | CrashRaised err -> CrashRaised err
             | Blocked -> Blocked
             | CrashRaised err -> CrashRaised err
@@ -295,7 +300,7 @@ module StageInventory =
             match StageObject.getObjectOnPos objectPos stage with
             | Passed (err, object) ->
                 inventory[idx] <- object
-                Passed(err, ())
+                Passed(err, [Minor])
             | Blocked -> Blocked
             | CrashRaised err -> CrashRaised err
         | None -> 
@@ -317,11 +322,11 @@ module StageInventory =
             match StageObject.putObjectToPos object objectPos stage with
             | Passed (err, _) -> 
                 inventory[inventoryIdx] <- Empty
-                Passed (err, [])
+                Passed (err, [Minor])
             | Blocked -> Blocked
             | CrashRaised err -> CrashRaised err
     
-    let inventorySelect (idx: int) = if idx >= GameCore.InventoryStack then Blocked else Passed (Set [NoBug], idx) 
+    let inventorySelect (idx: int) = if idx < 0 || idx >= GameCore.InventoryStack then None else Some idx 
     
 
 module StageInteraction =     
@@ -339,7 +344,7 @@ module StageInteraction =
                     playerInventory |> Array.indexed
                     |> Array.tryFind (fun (_, x) -> x = Key v)
                 match result with
-                | Some (idx, key) -> Passed (Set [NoBug], idx)
+                | Some (idx, key) -> Passed (Set.empty, idx)
                 | None -> Blocked
             else
                 let result = 
@@ -350,7 +355,7 @@ module StageInteraction =
                         | _ -> false
                     )
                 match result with
-                | Some (idx, Key x) when x = v -> Passed (Set [NoBug], idx)
+                | Some (idx, Key x) when x = v -> Passed (Set.empty, idx)
                 | Some (idx, _) -> Passed (Set [AnyKeyUsedExploit], idx)
                 | None -> Blocked
         | _ -> Blocked
@@ -371,7 +376,7 @@ module StageInteraction =
             match interactToDoor (Door v) stage with
             | Passed (err, idx) ->
                 doorDelete idx objectData stage |> ignore
-                Passed (err, [])
+                Passed (err, [Minor])
             | Blocked -> Blocked
             | CrashRaised err -> CrashRaised err
         | _ -> Blocked
@@ -393,15 +398,19 @@ module StageInteraction =
 
 
 module StageCore = 
-    let BlockSize = 40
     let DamperSizefromCenter = { 
-        X = (int GameCore.virtualScreenSize.X)/(2*BlockSize) + GameCore.GridPadding/2; 
-        Y = (int GameCore.virtualScreenSize.Y)/(2*BlockSize) + GameCore.GridPadding/2
+        X = (int GameCore.virtualScreenSize.X)/(2*GameCore.BlockSize) + GameCore.GridPadding/2; 
+        Y = (int GameCore.virtualScreenSize.Y)/(2*GameCore.BlockSize) + GameCore.GridPadding/2
     }
     let ScreenSizefromCenter = { 
-        X = (int GameCore.virtualScreenSize.X)/(2*BlockSize) + 2; 
-        Y = (int GameCore.virtualScreenSize.Y)/(2*BlockSize) + 2 
+        X = (int GameCore.virtualScreenSize.X)/(2*GameCore.BlockSize) + 2; 
+        Y = (int GameCore.virtualScreenSize.Y)/(2*GameCore.BlockSize) + 2 
     }
+
+    let DeadZone = Vector2(
+        GameCore.virtualScreenSize.X/(2.0f*(float32 GameCore.BlockSize))*GameCore.DeadZoneRatio,
+        GameCore.virtualScreenSize.Y/(2.0f*(float32 GameCore.BlockSize))*GameCore.DeadZoneRatio 
+    )
 
     let IsPosinScreen (realPos: Vector2) (center: GridPosition) = 
         let pos = StageGrid.vectorToGridPos realPos
@@ -412,65 +421,314 @@ module StageCore =
     let centerinStartPos (pos: GridPosition) (map: StageGrid) = 
         let maxX = map.width
         let maxY = map.height
-        let centerX = if pos.X - DamperSizefromCenter.X > 0 &&
+        let centerX = 
+            match pos.X - DamperSizefromCenter.X > 0, pos.X + DamperSizefromCenter.X < maxX with
+            | true, true -> float32 pos.X
+            | true, false -> float32 (maxX - DamperSizefromCenter.X)
+            | false, true -> float32 DamperSizefromCenter.X
+            | false, false -> float32 (maxX/2)
+        let centerY = 
+            match pos.Y - DamperSizefromCenter.Y > 0, pos.Y + DamperSizefromCenter.Y < maxY with
+            | true, true -> float32 pos.Y
+            | true, false -> float32 (maxY - DamperSizefromCenter.Y)
+            | false, true -> float32 DamperSizefromCenter.Y
+            | false, false -> float32 (maxY/2)
+        Vector2(centerX, centerY)
+    
+    let cameraInRealPos (realPos: Vector2) (cameraPos: Vector2) (stage: InStage) = 
+        let maxX = float32 stage.stageMap.width
+        let maxY = float32 stage.stageMap.height
+        let DamperX = float32 DamperSizefromCenter.X
+        let DamperY = float32 DamperSizefromCenter.Y
+        let centerX = 
+            match realPos.X - DamperX > 0.0f, realPos.X + DamperX < maxX with
+            | true, true -> 
+                if cameraPos.X + DamperX < realPos.X || cameraPos.X - DamperX > realPos.X then realPos.X
+                else cameraPos.X
+            | true, false ->  maxX - DamperX
+            | false, true -> DamperX
+            | false, false -> maxX/2.0f
+        let centerY = 
+            match realPos.Y - DamperY > 0.0f, realPos.Y + DamperY < maxY with
+            | true, true ->
+                if cameraPos.Y + DamperY < realPos.Y || cameraPos.Y - DamperY > realPos.Y then realPos.Y
+                else cameraPos.Y
+            | true, false -> maxY - DamperY
+            | false, true -> DamperY
+            | false, false -> maxY/2.0f
+        Vector2(centerX, centerY)
+    
+    let cameraTrace (cameraPos: Vector2) (cameraTarget: Vector2) = 
+        let cameraMove = (cameraTarget - cameraPos)*GameCore.cameraTraceSpeed
+        cameraPos + cameraMove
+
 
 
 module InStage = 
+    let moveTimeMap (gameMove: GameMove) = 
+        match gameMove with
+        | ObjectMove _ -> GameCore.DefaultActionDelay*1.2f, GameCore.DefaultActionDelay*1.2f
+        | Minor -> 0.0f, GameCore.DefaultActionDelay
+        | NoAction -> 0.0f, 0.0f
+        | StageVictory -> 0.0f, infinityf
+        | PlayerDead -> 0.0f, infinityf
+        | StageCrashed _ -> 0.0f, infinityf
+
     let newStage (map: CompactGrid) (patchMap: PatchMap) (inventoryFlag: bool) = 
         let stageGrid, playerPos = StageGrid.makeStageGrid map
+        let camera = StageCore.centerinStartPos playerPos stageGrid
         
         {
             patch = patchMap
             playerPos = playerPos
             prevPlayerPos = playerPos
             playerRealPos = StageGrid.gridPosToVector playerPos
-            cameraTarget = 
-            cameraPos = 
+            cameraTarget = camera
+            cameraPos = camera
             playerDirection = Direction.R
             stageMap = stageGrid
             inventoryFlag = inventoryFlag
             inventory = if inventoryFlag then Array.create GameCore.InventoryStack Empty else [||]
             selectedIdx = 0
             usedBug = Set.empty
-            movement = []
+            movement = ([], 0.0f)
             moveTime = None
             moveTimeSpent = 0.0f
             fullTimeSpent = 0.0f
         }
     
-    let updateByMovement (movement: (GameMove*int) list) (stage: InStage) = 
-        movement
-        |> List.iter (fun (move, _) -> StageObject.moveClearOnPos move stage)
+    let updateByMovement (gameMove : GameMove list * float32) (stage: InStage)= 
+        let movement, _ = gameMove
+        movement |> List.iter (fun move -> StageObject.moveClearOnPos move stage)
     
-    let update (action: KeyBind) (stage: InStage) (deltaTime: float32) = 
+    let update (action: KeyBind) (stage: InStage) (deltaTime: float32): InStage * bool = 
         match stage.moveTime with
         | Some movetime -> 
             let nextTime = stage.moveTimeSpent - deltaTime
             if nextTime > 0.0f then
+                let timeRatio = 1.0f - nextTime/movetime
+                let direction = stage.playerPos - stage.prevPlayerPos
+                let realPos = StageGrid.gridPosToVector stage.prevPlayerPos + Vector2(float32 direction.X*timeRatio, float32 direction.Y*timeRatio)
+                let cameraTarget = StageCore.cameraInRealPos realPos stage.cameraTarget stage
+                let cameraPos = StageCore.cameraTrace stage.cameraPos cameraTarget
                 { stage with 
-                    
+                    playerRealPos = realPos
+                    cameraTarget = cameraTarget
+                    cameraPos = cameraPos
                     moveTimeSpent = nextTime; 
                     fullTimeSpent = stage.fullTimeSpent + deltaTime 
-                }
+                }, false
             else
+                updateByMovement stage.movement stage
+                let realPos = StageGrid.gridPosToVector stage.playerPos
+                let cameraTarget = StageCore.cameraInRealPos realPos stage.cameraTarget stage
+                let cameraPos = StageCore.cameraTrace stage.cameraPos cameraTarget
                 { stage with 
                     prevPlayerPos = stage.playerPos;
-                    movement = [(Minor, 0.0f)]; 
+                    playerRealPos = realPos
+                    cameraTarget = cameraTarget
+                    cameraPos = cameraPos
+                    movement = ([], 0.0f); 
                     moveTime = None; 
                     moveTimeSpent = 0.0f; 
                     fullTimeSpent = stage.fullTimeSpent + deltaTime 
-                }
+                }, false
         | None ->
             let playerResult = StagePlayer.playerResult stage
             match playerResult with
-            | Passed (err, Victory) -> { stage with usedBug = Set.union err stage.usedBug; movement = [(StageVictory, 0.0f)]; moveTime = Some infinityf; moveTimeSpent = infinityf; fullTimeSpent = stage.fullTimeSpent + deltaTime }
-            | Passed (err, Dead) -> { stage with usedBug = Set.union err stage.usedBug; movement = [(PlayerDead, 0.0f)]; moveTime = Some infinityf; moveTimeSpent = infinityf; fullTimeSpent = stage.fullTimeSpent + deltaTime }
+            | Passed (err, Victory) -> 
+                let transtime, movetime = moveTimeMap StageVictory
+                { stage with 
+                    usedBug = Set.union err stage.usedBug; 
+                    movement = ([StageVictory], transtime); 
+                    moveTime = Some movetime; 
+                    moveTimeSpent = movetime; 
+                    fullTimeSpent = stage.fullTimeSpent + deltaTime 
+                }, false
+            | Passed (err, Dead) -> 
+                let transtime, movetime = moveTimeMap PlayerDead
+                { stage with 
+                    usedBug = Set.union err stage.usedBug; 
+                    movement = ([PlayerDead], transtime); 
+                    moveTime = Some movetime; 
+                    moveTimeSpent = movetime; 
+                    fullTimeSpent = stage.fullTimeSpent + deltaTime 
+                }, false
             | Passed (err, Alive) -> 
                 match action with
-                | Move direction -> stage
-                | GetObject -> stage
-                | PutDown -> stage
-                | _ -> { stage with fullTimeSpent = stage.fullTimeSpent + deltaTime }
+                | Move direction -> 
+                    let cameraTarget = StageCore.cameraInRealPos stage.playerRealPos stage.cameraTarget stage
+                    let cameraPos = StageCore.cameraTrace stage.cameraPos cameraTarget
+                    let result1 = StagePlayer.playerMove direction stage
+                    match result1 with
+                    | Passed (err1, objectList) ->
+                        let targetPos = 
+                            match objectList with
+                            | ObjectMove (_, _, targetPos) :: _ -> targetPos
+                            | _ -> stage.playerPos
+                        let transtime, movetime = moveTimeMap objectList.Head
+                        { stage with 
+                            playerPos = targetPos
+                            playerDirection = direction
+                            cameraTarget = cameraTarget
+                            cameraPos = cameraPos
+                            usedBug = Set.unionMany [err; err1; stage.usedBug]
+                            movement = (objectList, transtime); 
+                            moveTime = Some movetime; 
+                            moveTimeSpent = movetime;
+                            fullTimeSpent = stage.fullTimeSpent + deltaTime 
+                        }, true
+                    | Blocked ->
+                        let result2 = StageInteraction.playerInteract direction stage
+                        match result2 with
+                        | Passed (err1, gameMove) ->
+                            let transtime, movetime = moveTimeMap gameMove.Head
+                            { stage with 
+                                playerDirection = direction
+                                cameraTarget = cameraTarget
+                                cameraPos = cameraPos
+                                usedBug = Set.unionMany [err; err1; stage.usedBug]
+                                movement = (gameMove, transtime); 
+                                moveTime = Some movetime; 
+                                moveTimeSpent = movetime;
+                                fullTimeSpent = stage.fullTimeSpent + deltaTime 
+                            }, true
+                        | Blocked ->
+                            let transtime, movetime = moveTimeMap Minor
+                            { stage with 
+                                playerDirection = direction
+                                cameraTarget = cameraTarget
+                                cameraPos = cameraPos
+                                usedBug = Set.union err stage.usedBug
+                                movement = ([Minor], transtime); 
+                                moveTime = Some movetime; 
+                                moveTimeSpent = movetime;
+                                fullTimeSpent = stage.fullTimeSpent + deltaTime 
+                            }, true
+                        | CrashRaised err1 -> 
+                            let transtime, movetime = moveTimeMap (StageCrashed err1)
+                            { stage with 
+                                playerDirection = direction
+                                cameraTarget = cameraTarget
+                                cameraPos = cameraPos
+                                usedBug = Set.unionMany [err; Set [err1]; stage.usedBug]
+                                movement = ([StageCrashed err1], transtime); 
+                                moveTime = Some movetime; 
+                                moveTimeSpent = movetime;
+                                fullTimeSpent = stage.fullTimeSpent + deltaTime 
+                            }, true
+                    | CrashRaised err1 ->
+                        let transtime, movetime = moveTimeMap (StageCrashed err1)
+                        { stage with 
+                            playerDirection = direction
+                            cameraTarget = cameraTarget
+                            cameraPos = cameraPos
+                            usedBug = Set.unionMany [err; Set [err1]; stage.usedBug]
+                            movement = ([StageCrashed err1], transtime); 
+                            moveTime = Some movetime; 
+                            moveTimeSpent = movetime;
+                            fullTimeSpent = stage.fullTimeSpent + deltaTime 
+                        }, true
+                | GetObject when stage.inventoryFlag -> 
+                    let cameraTarget = StageCore.cameraInRealPos stage.playerRealPos stage.cameraTarget stage
+                    let cameraPos = StageCore.cameraTrace stage.cameraPos cameraTarget
+                    match StageInventory.inventoryGet stage with
+                    | Passed (err, gameMove) ->
+                        let transtime, movetime = moveTimeMap gameMove.Head
+                        { stage with 
+                            cameraTarget = cameraTarget
+                            cameraPos = cameraPos
+                            usedBug = Set.union err stage.usedBug
+                            movement = (gameMove, transtime); 
+                            moveTime = Some movetime; 
+                            moveTimeSpent = movetime;
+                            fullTimeSpent = stage.fullTimeSpent + deltaTime 
+                        }, true
+                    | Blocked ->
+                        let transtime, movetime = moveTimeMap NoAction
+                        { stage with 
+                            cameraTarget = cameraTarget
+                            cameraPos = cameraPos
+                            usedBug = Set.union err stage.usedBug
+                            movement = ([NoAction], transtime); 
+                            moveTime = None; 
+                            moveTimeSpent = movetime;
+                            fullTimeSpent = stage.fullTimeSpent + deltaTime
+                        }, true
+                    | CrashRaised err1 -> 
+                        let transtime, movetime = moveTimeMap (StageCrashed err1)
+                        { stage with 
+                            cameraTarget = cameraTarget
+                            cameraPos = cameraPos
+                            usedBug = Set.unionMany [err; Set [err1]; stage.usedBug]
+                            movement = ([StageCrashed err1], transtime); 
+                            moveTime = Some movetime; 
+                            moveTimeSpent = movetime;
+                            fullTimeSpent = stage.fullTimeSpent + deltaTime 
+                        }, true
+                | PutDown when stage.inventoryFlag -> 
+                    let cameraTarget = StageCore.cameraInRealPos stage.playerRealPos stage.cameraTarget stage
+                    let cameraPos = StageCore.cameraTrace stage.cameraPos cameraTarget
+                    match StageInventory.inventoryPut stage with
+                    | Passed (err, gameMove) ->
+                        let transtime, movetime = moveTimeMap gameMove.Head
+                        { stage with 
+                            cameraTarget = cameraTarget
+                            cameraPos = cameraPos
+                            usedBug = Set.union err stage.usedBug
+                            movement = (gameMove, transtime); 
+                            moveTime = Some movetime; 
+                            moveTimeSpent = movetime;
+                            fullTimeSpent = stage.fullTimeSpent + deltaTime 
+                        }, true
+                    | Blocked ->
+                        let transtime, movetime = moveTimeMap NoAction
+                        { stage with 
+                            cameraTarget = cameraTarget
+                            cameraPos = cameraPos
+                            usedBug = Set.union err stage.usedBug
+                            movement = ([NoAction], transtime); 
+                            moveTime = None; 
+                            moveTimeSpent = movetime;
+                            fullTimeSpent = stage.fullTimeSpent + deltaTime
+                        }, true
+                    | CrashRaised err1 -> 
+                        let transtime, movetime = moveTimeMap (StageCrashed err1)
+                        { stage with 
+                            cameraTarget = cameraTarget
+                            cameraPos = cameraPos
+                            usedBug = Set.unionMany [err; Set [err1]; stage.usedBug]
+                            movement = ([StageCrashed err1], transtime); 
+                            moveTime = Some movetime; 
+                            moveTimeSpent = movetime;
+                            fullTimeSpent = stage.fullTimeSpent + deltaTime 
+                        }, true
+                | Number v when stage.inventoryFlag ->
+                    let cameraTarget = StageCore.cameraInRealPos stage.playerRealPos stage.cameraTarget stage
+                    let cameraPos = StageCore.cameraTrace stage.cameraPos cameraTarget
+                    let result = StageInventory.inventorySelect (v - 1)
+                    match result with
+                    | Some idx ->
+                        { stage with 
+                            selectedIdx = idx
+                            cameraTarget = cameraTarget
+                            cameraPos = cameraPos
+                            fullTimeSpent = stage.fullTimeSpent + deltaTime 
+                        }, true
+                    | None ->
+                        { stage with 
+                            cameraTarget = cameraTarget
+                            cameraPos = cameraPos
+                            fullTimeSpent = stage.fullTimeSpent + deltaTime 
+                        }, false
+                | _ -> 
+                    let cameraTarget = StageCore.cameraInRealPos stage.playerRealPos stage.cameraTarget stage
+                    let cameraPos = StageCore.cameraTrace stage.cameraPos cameraTarget
+                    { stage with 
+                        cameraTarget = cameraTarget
+                        cameraPos = cameraPos
+                        fullTimeSpent = stage.fullTimeSpent + deltaTime 
+                    }, false
             | _ -> failwith "Game Real Crashed with Unexpected State in PlayerResult. This Cannot Happen Because of PlayerResult Definition."
 
 

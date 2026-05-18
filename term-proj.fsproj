@@ -12,6 +12,7 @@
     <Compile Include="KeyboardMap.fs" />
     <Compile Include="StageBase.fs" />
     <Compile Include="StagePlaying.fs" />
+    <Compile Include="Stage.fs" />
     <Compile Include="GameState.fs" />
     <Compile Include="Screens.fs" />
     <Compile Include="MainGame.fs" />
@@ -25,6 +26,9 @@
 
   <ItemGroup>
     <MonoGameContentReference Include="content\content.mgcb" />
+    <None Include="content\maps\*.csv">
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+    </None>
   </ItemGroup>
 
 </Project>

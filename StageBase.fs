@@ -3,7 +3,6 @@ namespace TermProj
 open Microsoft.Xna.Framework
 
 type BugPatch = 
-    | NoBug
     // Initial bug
     | PlayerCollisionExploit // Exploit
     | StagePositionOutCrash // Crashed
@@ -21,6 +20,8 @@ type BugPatch =
     | AnyKeyUsedExploit // Exploit
 
 type Update = 
+    | NoUpdate
+    | InitialStage // Stage 0 
     | Walk
     | PushBlock
     | AbyssAndGround
@@ -152,9 +153,23 @@ module StageParser =
         "K", Key 0
         "K1", Key 1
         "K2", Key 2
+        "K3", Key 3
+        "K4", Key 4
+        "K5", Key 5
+        "K6", Key 6
+        "K7", Key 7
+        "K8", Key 8
+        "K9", Key 9
         "D", Door 0
         "D1", Door 1
         "D2", Door 2
+        "D3", Door 3
+        "D4", Door 4
+        "D5", Door 5
+        "D6", Door 6
+        "D7", Door 7
+        "D8", Door 8
+        "D9", Door 9
     ]
 
     let stringToObject (token: string) (isNoGround: bool) =

@@ -126,18 +126,31 @@ module DrawUI =
         let scale = Vector2(size.X/(float32 texture.Width), size.Y/(float32 texture.Height))
         spriteBatch.Draw(texture, pos, System.Nullable<Rectangle>(), color, 0.0f, Vector2.Zero, scale, SpriteEffects.None, 0.0f)
     
-    
     /// draw sub screen in main screen. Offset is for transition
     let subScreenDraw (context: DrawContext) (subScreen: UI.SubScreen) (offset: Vector2) (colorscale: float32) =
         subScreen.inner |> List.iter (function
             | UI.Text innertext ->
-                let font = GameCore.getFont context innertext.font
-                let textSize = font.MeasureString(innertext.content)*innertext.scale
-                let realpos = UI.getRealPos innertext.pos textSize subScreen
-                drawText context.spriteBatch font innertext.content (realpos + offset) (Color.Multiply(innertext.color, colorscale)) innertext.scale
+                let Somefont = AssetMap.getFont context innertext.font
+                match Somefont with
+                | Some font ->
+                    let textSize = font.MeasureString(innertext.content)*innertext.scale
+                    let realpos = UI.getRealPos innertext.pos textSize subScreen
+                    drawText context.spriteBatch font innertext.content (realpos + offset) (Color.Multiply(innertext.color, colorscale)) innertext.scale
+                | None ->
+                    let font = AssetMap.getDefaultFont context 
+                    let textSize = font.MeasureString(innertext.content)*innertext.scale
+                    let realpos = UI.getRealPos innertext.pos textSize subScreen
+                    drawText context.spriteBatch font innertext.content (realpos + offset) (Color.Multiply(innertext.color, colorscale)) innertext.scale
             | UI.Texture innertexture -> 
                 let realpos = UI.getRealPos innertexture.pos innertexture.size subScreen
-                drawTexture context.spriteBatch (GameCore.getTexture context innertexture.texture) (realpos + offset) innertexture.size (Color.Multiply(innertexture.color, colorscale))
+                let someTexture = AssetMap.getTexture context innertexture.texture
+                match someTexture with
+                | Some texture ->
+                    drawTexture context.spriteBatch texture (realpos + offset) innertexture.size (Color.Multiply(innertexture.color, colorscale))
+                | None ->
+                    let texture = AssetMap.getDefaultTexture context
+                    drawTexture context.spriteBatch texture (realpos + offset) innertexture.size (Color.Multiply(innertexture.color, colorscale))
+                
         )
     /// draw button with button state.
     let buttonDraw (context: DrawContext) (button: UI.ButtonInfo) (state: UI.ButtonCurrent) (offset: Vector2) =
@@ -155,7 +168,7 @@ module DrawUI =
     
     // for scene test
     let drawBlackScreen (context: DrawContext) (opacity: float32) (offset: Vector2) =
-        let black = GameCore.getTexture context TextureID.BasePixel
+        let black = AssetMap.getDefaultTexture context
         let color = Color(0.0f, 0.0f, 0.0f, opacity)
         drawTexture context.spriteBatch black offset  (Vector2(1280.0f, 720.0f)) color
     // Draw from ScreenMap

@@ -32,7 +32,7 @@ type MainGame() as self =
     
 
     do
-        self.Content.RootDirectory <- "content"
+        self.Content.RootDirectory <- AssetMap.contents
         self.IsMouseVisible <- true
         self.Window.AllowUserResizing <- true
 
