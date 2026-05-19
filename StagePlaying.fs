@@ -411,12 +411,13 @@ module StageCore =
         GameCore.virtualScreenSize.X/(2.0f*(float32 GameCore.BlockSize))*GameCore.DeadZoneRatio,
         GameCore.virtualScreenSize.Y/(2.0f*(float32 GameCore.BlockSize))*GameCore.DeadZoneRatio 
     )
-
-    let IsPosinScreen (realPos: Vector2) (center: GridPosition) = 
-        let pos = StageGrid.vectorToGridPos realPos
+    
+    let rangeDrawBlock (stage: InStage) = 
+        let center = StageGrid.vectorToGridPos stage.cameraPos
         let minScreen = center - ScreenSizefromCenter
         let maxScreen = center + ScreenSizefromCenter
-        pos.X >= minScreen.X && pos.X <= maxScreen.X && pos.Y >= minScreen.Y && pos.Y <= maxScreen.Y
+
+        (max minScreen.X 0, min maxScreen.X stage.stageMap.width), (max minScreen.Y 0, min maxScreen.Y stage.stageMap.height)
     
     let centerinStartPos (pos: GridPosition) (map: StageGrid) = 
         let maxX = map.width

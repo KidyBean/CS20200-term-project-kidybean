@@ -99,6 +99,21 @@ module StageGrid =
             objectArr[l] <- object
         objectArr
     
+    let rec private _isObjectInPos (pos: GridPosition) (object: ObjectType) (stage: StageGrid) (layer: int) = 
+        if layer >= stage.objectLayer then false
+        else
+            match stage.objects[layer, pos.X, pos.Y] with
+            | Empty -> false
+            | obj when obj = object -> true
+            | _ -> _isObjectInPos pos object stage (layer + 1)
+
+    let isObjectInPos (pos: GridPosition) (object: ObjectType) (stage: StageGrid) = 
+        if isPosOutOfStage pos stage then false
+        else
+            _isObjectInPos pos object stage 0
+            
+                
+    
     let groundOnPos (pos: GridPosition) (stage: StageGrid) = stage.ground[pos.X, pos.Y]
 
     let putObject (object: ObjectType) (layer: int) (pos: GridPosition) (stage: StageGrid) = 
@@ -109,18 +124,18 @@ module StageGrid =
         let numObjects = Array.length objects
         if numObjects > 0 then
             if isBaseRemain then
-                let rawOffset = numObjects - GameCore.objectLayer - 1
+                let rawOffset = numObjects - stage.objectLayer
                 let offset = if rawOffset > 0 then rawOffset else 0
                 putObject objects[0] 0 pos stage
-                for idx in 1..GameCore.objectLayer do
+                for idx in 1..stage.objectLayer do
                     if idx < numObjects - offset then
                         putObject objects[idx + offset] idx pos stage
                     else
                         putObject Empty idx pos stage
             else
-                let rawOffset = numObjects - GameCore.objectLayer
+                let rawOffset = numObjects - stage.objectLayer
                 let offset = if rawOffset > 0 then rawOffset else 0
-                for idx in 0..GameCore.objectLayer - 1 do
+                for idx in 0..stage.objectLayer - 1 do
                     if idx < numObjects - offset then
                         putObject objects[idx + offset] idx pos stage
                     else

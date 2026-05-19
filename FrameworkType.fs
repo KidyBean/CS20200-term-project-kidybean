@@ -214,6 +214,8 @@ module AssetMap =
         | Spec of int
         | SpecDirection of Direction
         | SpecDirectionList of Direction list
+        | Upper of GroundType
+        | UpperObject of ObjectType
         | NoSpec
     
     let contents = "content"
@@ -230,16 +232,14 @@ module AssetMap =
         | DefaultFont -> "font/DefaultFont"
         | TitleFont -> "font/DefaultFont"
     
-    let playerTexture (spec: AssetSpec) =
-        match spec with
+    let playerTexture = function
         | SpecDirection U -> PlayerU
         | SpecDirection D -> PlayerD
         | SpecDirection L -> PlayerL
         | SpecDirection R -> PlayerR
         | _ -> PlayerR
     
-    let wallTexture (spec: AssetSpec) = 
-        match spec with
+    let wallTexture (spec: AssetSpec) = function
         | NoSpec -> WallTexture
         | SpecDirectionList [U] -> WallU
         | SpecDirectionList [D] -> WallD
@@ -269,6 +269,10 @@ module AssetMap =
         | Key _ -> KeyTexture
         | Door _ -> DoorTexture
         | Empty -> NoTexture
+
+    let cliffTexture 
+
+    let GroundTexture (ground: GroundType) (spec: AssetSpec) = 
     
     let hsvColor (h: float32) (s: float32) (v: float32)  = 
         let h = ((h % 360.0f) + 360.0f) % 360.0f

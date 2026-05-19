@@ -44,9 +44,10 @@ module Stage =
         let scale = Vector2(float32 GameCore.BlockSize, float32 GameCore.BlockSize)
         context.spriteBatch.Draw(shape, pos, System.Nullable<Rectangle>(), color, 0.0f, Vector2.Zero, scale, SpriteEffects.None, 0.0f)
 
-    let drawCell (context: DrawContext) (object: ObjectType) (spec: AssetMap.AssetSpec) (pos: Vector2) = 
+    let drawObject (context: DrawContext) (object: ObjectType) (spec: AssetMap.AssetSpec) (pos: Vector2) = 
         let textureID = AssetMap.ObjectTexture object spec
         let someTexture = Map.tryFind textureID context.assets.textures
+        let pixel = Vector2(pos.X*float32 GameCore.BlockSize, pos.Y*float32 GameCore.BlockSize)
         let idx = 
             match object with
             | Key idx -> idx
@@ -56,9 +57,68 @@ module Stage =
         match someTexture with
         | Some texture -> 
             let scale = Vector2(float32 GameCore.BlockSize/float32 texture.Width, float32 GameCore.BlockSize/float32 texture.Height)
-            context.spriteBatch.Draw(texture, pos, System.Nullable<Rectangle>(), color, 0.0f, Vector2.Zero, scale, SpriteEffects.None, 0.0f)
-        | None -> drawDefault context pos color
+            context.spriteBatch.Draw(texture, pixel, System.Nullable<Rectangle>(), color, 0.0f, Vector2.Zero, scale, SpriteEffects.None, 0.0f)
+        | None -> drawDefault context pixel color
+    
+    let drawGround (context: DrawContext) (ground: GroundType) (spec: AssetMap.AssetSpec) (pos: Vector2) = 
+        let textureID = AssetMap.GroundTexture ground spec
+        let someTexture = Map.tryFind textureID context.assets.textures
+        let pixel = Vector2(pos.X*float32 GameCore.BlockSize, pos.Y*float32 GameCore.BlockSize)
+        let color = Color.White
+        match someTexture with
+        | Some texture -> 
+            let scale = Vector2(float32 GameCore.BlockSize/float32 texture.Width, float32 GameCore.BlockSize/float32 texture.Height)
+            context.spriteBatch.Draw(texture, pixel, System.Nullable<Rectangle>(), color, 0.0f, Vector2.Zero, scale, SpriteEffects.None, 0.0f)
+        | None -> ()
 
-    let drawCellInIteration (context: DrawContext) (pos: GridPosition) (object: ObjectType) (stage: InStage) = 
+    let getSpec (pos: GridPosition) (object: ObjectType) (stage: InStage) = 
+        let stageMap = stage.stageMap
+        match object with
+        | Player -> AssetMap.SpecDirection stage.playerDirection
+        | Wall -> 
+            AssetMap.SpecDirectionList [
+                if StageGrid.isObjectInPos (pos + StageGrid.directionToGrid U) Wall stageMap then U
+                if StageGrid.isObjectInPos (pos + StageGrid.directionToGrid D) Wall stageMap then D
+                if StageGrid.isObjectInPos (pos + StageGrid.directionToGrid L) Wall stageMap then L
+                if StageGrid.isObjectInPos (pos + StageGrid.directionToGrid R) Wall stageMap then R
+            ]
+        | _ -> AssetMap.NoSpec
 
+    let drawCellInIteration (context: DrawContext) (pos: GridPosition) (objects: ObjectType[]) (stage: InStage) = 
+        let realPos = StageGrid.gridPosToVector pos - stage.cameraPos
+        objects
+        |> Array.iter (fun object ->
+                match object with
+                | Empty -> ()
+                | _ ->
+                    let spec = getSpec pos object stage
+                    drawObject context object spec realPos
+            )
 
+    let drawGroundInIteration (context: DrawContext) (pos: GridPosition) (ground: GroundType) (stage: InStage) = 
+        let realPos = StageGrid.gridPosToVector pos - stage.cameraPos
+        match ground with
+        | Abyss | AbyssGround -> 
+            let upper = pos + { X = 0; Y = -1 }
+            if StageGrid.isPosOutOfStage upper stage.stageMap then
+
+        | Ground
+        | ObjectGround object
+
+    let drawInventory (context: DrawContext) (stage: InStage) = 
+        ()
+    
+    let drawGameMove (context: DrawContext) (gamemove: GameMove) (stage: InStage) = 
+        match gamemove, stage.moveTime with
+        | ObjectMove (objects, from, goto), Some movetime when movetime <> 0.0f ->
+            let delta = StageGrid.gridPosToVector (from - goto)
+            let deltaRatio = stage.moveTimeSpent/movetime
+            let realPos = StageGrid.gridPosToVector from + Vector2(delta.X*deltaRatio, delta.Y*deltaRatio)
+            objects
+            |> Array.iter (fun object ->
+                    match object with
+                    | Empty -> ()
+                    | Player -> drawObject context object (AssetMap.SpecDirection stage.playerDirection) realPos
+                    | _ -> drawObject context object AssetMap.NoSpec realPos
+                )
+        | _ -> ()
