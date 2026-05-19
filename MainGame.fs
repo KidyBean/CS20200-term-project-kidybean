@@ -62,7 +62,7 @@ type MainGame() as self =
         inputState <- { mouse = mouseInput; keyboard = keyInput }
         let deltaTime = float32 gameTime.ElapsedGameTime.TotalSeconds
         
-        let newScreen, action = Screens.update screenState inputState deltaTime
+        let newScreen, (action, gamestateChange) = Screens.update screenState playState inputState deltaTime
         screenState <- newScreen
         match action with
         | Some UI.Blocked -> ()

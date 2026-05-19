@@ -14,7 +14,7 @@ type Fonts = Map<FontID, SpriteFont>
 type TextureID = 
     | BasePixel
     | NoTexture // for Blank
-
+    // Object Texture
     | PlayerU
     | PlayerD
     | PlayerL
@@ -40,6 +40,15 @@ type TextureID =
     | BoxTexture
     | KeyTexture
     | DoorTexture
+    // Ground Texture
+    | GroundTexture
+    | BoxGround
+    | GroundCliff
+    | BoxCliff
+    // UI texture
+
+module debug = 
+    let UITextureReady = false
 
 
 type Textures = Map<TextureID, Texture2D>
@@ -110,104 +119,10 @@ module GameCore =
     let defaultDeltaTime = 0.016f // 60fps - test
 
 
-module UI = 
-    type HorizontalPos = 
-        | Left
-        | CenterX
-        | Right
-    type VerticalPos = 
-        | Top
-        | CenterY
-        | Bottom
-    
-    type InnerPos =
-        | AlignPos of HorizontalPos * VerticalPos
-        | CustomPos of Vector2
-        | CustomRatioPos of Vector2
-    
-    type InnerText = {
-        content: string
-        color: Color
-        font: FontID
-        scale: float32
-        pos: InnerPos
-    }
 
-    type InnerTexture = {
-        texture: TextureID
-        color: Color
-        size: Vector2
-        pos: InnerPos
-    }
-    
-    type SubScreenInner = 
-        | Text of InnerText
-        | Texture of InnerTexture
 
-    type SubScreen = {
-        inner: SubScreenInner list
-        pos: Vector2
-        size: Vector2
-    }
-    
-    type ButtonInfo = {
-        Id: int
-        normalLayout: SubScreen
-        hoveredLayout: SubScreen option
-        pressedLayout: SubScreen option
-    }
 
-    type ButtonCurrent = 
-        | Normal
-        | Hovered
-        | Pressed
 
-    type ScreenUI = {
-        buttons: ButtonInfo list
-        subscreens: SubScreen list
-    }
-
-    type UIAction = 
-        | Moveto of GameScreen
-        | Blocked
-        | Dummy
-
-    type ScreenInteract = {
-        buttons: Map<int, UIAction>
-        keys: Map<KeyBind, UIAction>
-    }
-
-    type ScreenCache = {
-        layout: Map<int, ScreenUI>
-        interact: Map<int, ScreenInteract>
-    }
-
-    let isInButton (mousePos: Vector2) (button: ButtonInfo) =
-        let buttonPos = button.normalLayout.pos
-        let buttonSize = button.normalLayout.size
-        mousePos.X >= buttonPos.X && mousePos.X <= buttonPos.X + buttonSize.X &&
-        mousePos.Y >= buttonPos.Y && mousePos.Y <= buttonPos.Y + buttonSize.Y
-    
-    let getButton (mousePos: Vector2) (screenUI: ScreenUI) =
-        screenUI.buttons
-        |> List.tryPick (fun button -> if (isInButton mousePos button) then Some button.Id else None)
-    
-    let getRealPos (innerPos: InnerPos) (size: Vector2) (subScreen: SubScreen) =
-        match innerPos with
-        | AlignPos (h, v) ->
-            let x =
-                match h with
-                | Left -> subScreen.pos.X + subScreen.size.X*0.1f
-                | CenterX -> subScreen.pos.X + (subScreen.size.X - size.X)*0.5f
-                | Right -> subScreen.pos.X + subScreen.size.X - size.X - subScreen.size.X*0.1f
-            let y =
-                match v with
-                | Top -> subScreen.pos.Y + subScreen.size.Y*0.1f
-                | CenterY -> subScreen.pos.Y + (subScreen.size.Y - size.Y)*0.5f
-                | Bottom -> subScreen.pos.Y + subScreen.size.Y - size.Y - subScreen.size.Y*0.1f
-            Vector2(x, y)
-        | CustomPos pos -> subScreen.pos + pos
-        | CustomRatioPos r -> Vector2(subScreen.pos.X + r.X*subScreen.size.X, subScreen.pos.Y + r.Y*subScreen.size.Y)
 
 module AssetMap = 
     type AssetSpec = 
@@ -226,6 +141,11 @@ module AssetMap =
 
     let textureToAssetName = function
         | BasePixel -> None 
+        | NoTexture -> None
+        | PlayerU -> Some "texture/PlayerU"
+        | PlayerD -> Some "texture/PlayerD"
+        | PlayerL -> Some "texture/PlayerL"
+        | PlayerR -> Some "texture/PlayerR"
         | _ -> None
     
     let fontToAssetName = function
@@ -239,7 +159,7 @@ module AssetMap =
         | SpecDirection R -> PlayerR
         | _ -> PlayerR
     
-    let wallTexture (spec: AssetSpec) = function
+    let wallTexture = function
         | NoSpec -> WallTexture
         | SpecDirectionList [U] -> WallU
         | SpecDirectionList [D] -> WallD
@@ -270,9 +190,20 @@ module AssetMap =
         | Door _ -> DoorTexture
         | Empty -> NoTexture
 
-    let cliffTexture 
+    let cliffTexture = function
+    | Upper Ground -> GroundCliff
+    | UpperObject Box -> BoxCliff
+    | _ -> NoTexture
+
+    let objectGroundTexture = function
+    | Box -> BoxGround
+    | v -> ObjectTexture v NoSpec
 
     let GroundTexture (ground: GroundType) (spec: AssetSpec) = 
+        match ground with
+        | Ground -> GroundTexture
+        | Abyss | AbyssGround -> cliffTexture spec
+        | ObjectGround object -> objectGroundTexture object
     
     let hsvColor (h: float32) (s: float32) (v: float32)  = 
         let h = ((h % 360.0f) + 360.0f) % 360.0f

@@ -12,7 +12,6 @@ type GameMove =
     | StageCrashed of BugPatch
 
 
-
 type InStage = {
     patch: PatchMap
     playerPos: GridPosition
@@ -31,6 +30,7 @@ type InStage = {
     moveTimeSpent: float32
     fullTimeSpent: float32
 }
+
 
 type InStageResult<'A> = 
     | Passed of BugPatch Set*'A
@@ -84,8 +84,8 @@ module StageObject =
             if not canMoveTarget then Blocked
             elif targetObject = Empty then Passed (Set.empty, Empty)
             elif StageGrid.isPosOutOfStage next stage.stageMap then 
-                if Set.contains StagePositionOutCrash patchList then CrashRaised StagePositionOutCrash
-                else Blocked
+                if Set.contains StagePositionOutCrash patchList then Blocked
+                else CrashRaised StagePositionOutCrash
             else Passed (Set.empty, targetObject)
         match result with
         | CrashRaised err -> CrashRaised err
@@ -417,7 +417,7 @@ module StageCore =
         let minScreen = center - ScreenSizefromCenter
         let maxScreen = center + ScreenSizefromCenter
 
-        (max minScreen.X 0, min maxScreen.X stage.stageMap.width), (max minScreen.Y 0, min maxScreen.Y stage.stageMap.height)
+        (max minScreen.X 0, min maxScreen.X (stage.stageMap.width - 1)), (max minScreen.Y 0, min maxScreen.Y (stage.stageMap.height - 1))
     
     let centerinStartPos (pos: GridPosition) (map: StageGrid) = 
         let maxX = map.width
@@ -444,7 +444,7 @@ module StageCore =
         let centerX = 
             match realPos.X - DamperX > 0.0f, realPos.X + DamperX < maxX with
             | true, true -> 
-                if cameraPos.X + DamperX < realPos.X || cameraPos.X - DamperX > realPos.X then realPos.X
+                if cameraPos.X + DeadZone.X < realPos.X || cameraPos.X - DeadZone.X > realPos.X then realPos.X
                 else cameraPos.X
             | true, false ->  maxX - DamperX
             | false, true -> DamperX
@@ -452,7 +452,7 @@ module StageCore =
         let centerY = 
             match realPos.Y - DamperY > 0.0f, realPos.Y + DamperY < maxY with
             | true, true ->
-                if cameraPos.Y + DamperY < realPos.Y || cameraPos.Y - DamperY > realPos.Y then realPos.Y
+                if cameraPos.Y + DeadZone.X < realPos.Y || cameraPos.Y - DeadZone.X > realPos.Y then realPos.Y
                 else cameraPos.Y
             | true, false -> maxY - DamperY
             | false, true -> DamperY
@@ -504,6 +504,8 @@ module InStage =
     
     let update (action: KeyBind) (stage: InStage) (deltaTime: float32): InStage * bool = 
         match stage.moveTime with
+        | Some movetime when System.Single.IsInfinity movetime -> 
+            { stage with fullTimeSpent = stage.fullTimeSpent + deltaTime }, false
         | Some movetime -> 
             let nextTime = stage.moveTimeSpent - deltaTime
             if nextTime > 0.0f then

@@ -2,121 +2,9 @@ namespace TermProj
 
 open Microsoft.Xna.Framework
 open Microsoft.Xna.Framework.Graphics
-open Microsoft.Xna.Framework.Input
 
-
-module InteractUI = 
-    let isLeftPressed (input: InputState) = 
-        input.mouse.curMouse.LeftButton = ButtonState.Pressed
-    let isLeftClicked (input: InputState) = 
-        input.mouse.curMouse.LeftButton = ButtonState.Released && input.mouse.prevMouse.LeftButton = ButtonState.Pressed
-
-    let getButtonState (screen: UI.ScreenUI) (input: InputState) = 
-        match UI.getButton input.mouse.pos screen with
-        | Some id -> 
-            let state = if (isLeftPressed input) then UI.Pressed else UI.Hovered
-            Some (id, state)
-        | None -> None
-    
-    let getClickedButton (screen: UI.ScreenUI) (input: InputState) = 
-        if (isLeftClicked input) then
-            let curButton = UI.getButton input.mouse.pos screen
-            let prevButton = UI.getButton input.mouse.prevPos screen
-            match curButton, prevButton with
-            | Some cid, Some pid when cid = pid -> Some cid
-            | _ -> None
-        else None
-
-
-module ScreenMap = 
-    /// Main Menu Screen ---------------------------------------------------------------------
-    let MainMenu: UI.ScreenUI = 
-        // title
-        let titleText: UI.InnerText = { 
-            font = DefaultFont 
-            content = "Play In Progress"
-            color = Color.White
-            scale = 3.0f
-            pos = UI.AlignPos (UI.CenterX, UI.CenterY)
-        }
-        let titleScreen: UI.SubScreen = {
-            inner = [UI.Text titleText]
-            pos = Vector2(100.0f, 100.0f)
-            size = Vector2(1080.0f, 200.0f)
-        }
-        // press enter to start
-        let promptText: UI.InnerText = { 
-            font = DefaultFont 
-            content = "Press Enter to Start"
-            color = Color.White
-            scale = 1.0f
-            pos = UI.AlignPos (UI.CenterX, UI.CenterY)
-        }
-        let promptScreen: UI.SubScreen = {
-            inner = [UI.Text promptText]
-            pos = Vector2(100.0f, 500.0f)
-            size = Vector2(1080.0f, 100.0f)
-        }
-
-        // organize
-        let subscreens = [titleScreen; promptScreen]
-        let buttons = []
-        { buttons = buttons; subscreens = subscreens }
-    /// Main Menu Interaction
-    let MainMenuInteract: UI.ScreenInteract = {
-        buttons = Map.empty
-        keys = Map [
-            Confirm, UI.Moveto (StageSelect 0)
-        ]
-    }
-    /// Stage Select Screen ----------------------------------------------------------------
-    let StageSelectBase (v: int) : UI.ScreenUI = 
-        let patchVerText: UI.InnerText = {
-            font = DefaultFont 
-            content = sprintf "Patch Ver 1.%02d" v
-            color = Color.White
-            scale = 2.0f
-            pos = UI.AlignPos (UI.CenterX, UI.Top)
-        }
-        let DescText: UI.InnerText = {
-            font = DefaultFont 
-            content = "Our First Release"
-            color = Color.White
-            scale = 1.0f
-            pos = UI.AlignPos (UI.CenterX, UI.CenterY)
-        }
-        let promptText: UI.InnerText = {
-            font = DefaultFont 
-            content = "Press Enter"
-            color = Color.White
-            scale = 1.0f
-            pos = UI.AlignPos (UI.CenterX, UI.Bottom)
-        }
-        let levelScreen: UI.SubScreen = {
-            inner = [UI.Text patchVerText; UI.Text DescText; UI.Text promptText]
-            pos = Vector2(100.0f, 100.0f)
-            size = Vector2(1080.0f, 620.0f)
-        }
-
-        let subscreens = [levelScreen]
-        let buttons = []
-        { buttons = buttons; subscreens = subscreens }
-    let StageSelectInteractBase (v: int) : UI.ScreenInteract = 
-        {
-            buttons = Map.empty
-            keys = Map.empty
-        }
-    let StageSelectCache: UI.ScreenCache = 
-        let layout = List.map (fun v -> (v, StageSelectBase v)) [0..GameCore.gameStage] |> Map.ofList
-        let interact = List.map (fun v -> (v, StageSelectInteractBase v)) [0..GameCore.gameStage] |> Map.ofList
-        { layout = layout; interact = interact }
-    let StageSelect v = StageSelectCache.layout |> Map.find v
-    let StageSelectInteract v = StageSelectCache.interact |> Map.find v
-
-
-
-
-
+/// On Screen.fs
+/// module for draw one screen
 module DrawUI = 
     /// draw text with font.
     let drawText (spriteBatch: SpriteBatch) (font: SpriteFont) (text: string) (pos: Vector2) (color: Color) (scale: float32) =
@@ -152,6 +40,7 @@ module DrawUI =
                     drawTexture context.spriteBatch texture (realpos + offset) innertexture.size (Color.Multiply(innertexture.color, colorscale))
                 
         )
+    
     /// draw button with button state.
     let buttonDraw (context: DrawContext) (button: UI.ButtonInfo) (state: UI.ButtonCurrent) (offset: Vector2) =
         match state with
@@ -171,7 +60,7 @@ module DrawUI =
         let black = AssetMap.getDefaultTexture context
         let color = Color(0.0f, 0.0f, 0.0f, opacity)
         drawTexture context.spriteBatch black offset  (Vector2(1280.0f, 720.0f)) color
-    // Draw from ScreenMap
+    /// Draw from ScreenMap
     let screenDraw (context: DrawContext) (screen: UI.ScreenUI) (buttonState: (int * UI.ButtonCurrent) option) (offset: Vector2) =
         screen.subscreens |> List.iter (fun sub -> subScreenDraw context sub offset 1.0f)
         match buttonState with
@@ -184,7 +73,7 @@ module DrawUI =
 
 
 
-
+/// On Screen.fs
 module Screens = 
     type Transition = {
         target: GameScreen
@@ -203,41 +92,29 @@ module Screens =
         buttonState = None
         transition = None
     }
-    let tryNextScreenAction (screen: UI.ScreenUI) (interact: UI.ScreenInteract) (input: InputState) = 
-        let buttonResult = 
-            match InteractUI.getClickedButton screen input with
-            | Some buttonId -> Map.tryFind buttonId interact.buttons
-            | None -> None
-        match buttonResult, input.keyboard.curKey with
-        | Some action, _ -> Some action
-        | None, Some key when input.keyboard.prevKey <> Some key -> Map.tryFind key interact.keys
-        | _, _ -> None
 
     /// Get next action from input and gamescreen
-    let getNextAction (currentScreen: GameScreen) (input: InputState) =
+    let getNextAction (currentScreen: GameScreen) (state: GameState) (input: InputState) =
         match currentScreen with
         | MainMenu ->
             let buttonState = InteractUI.getButtonState ScreenMap.MainMenu input
-            let action = tryNextScreenAction ScreenMap.MainMenu ScreenMap.MainMenuInteract input
+            let action = InteractUI.tryNextScreenAction ScreenMap.MainMenu (ScreenMap.MainMenuInteract state) input
             (buttonState, action)
-        | _ -> None, None
+        | _ -> None, (None, NoStateChange)
+    
+    /// Draws the current screen with offset for transition
+    let drawScreen (context: DrawContext) (screen: GameScreen) (buttonState: (int * UI.ButtonCurrent) option) (playState: GameState) (offset: Vector2) =
+        match screen with
+        | BlackScreen v -> DrawUI.drawBlackScreen context v offset
+        | MainMenu -> DrawUI.screenDraw context ScreenMap.MainMenu buttonState offset
+        | StageSelect v -> DrawUI.screenDraw context (ScreenMap.StageSelect v) buttonState offset
+        | _ -> DrawUI.drawBlackScreen context 1.0f offset
 
 
-    /// Determines the transition type based on the current screen and the next screen
-    let getTransition currentScreen nextScreen = 
-        match currentScreen with
-        | MainMenu -> Some (Fade, 0.8f) // Some (Sudden 0.0f, 0.0f)
-        | StageSelect a ->
-            match nextScreen with
-            | StagePlaying _ -> Some (Fade, 1.0f)
-            | StageSelect b when b > a -> Some (Slide L, 0.5f)
-            | StageSelect b when b < a -> Some (Slide R, 0.5f)
-            | _ -> None
-        | StagePlaying _ ->
-            match nextScreen with
-            | StageSelect _ -> Some (Fade, 1.0f)
-            | _ -> None
-        | _ -> Some (Sudden 0.0f, 0.0f)
+
+
+
+
     /// Updates the screen state when screen goes to a new screen with a transition
     let updateState (currentState: ScreenState) (nextScreen: GameScreen) (transitionDuration: float32) (transitionType: TransitionType) : ScreenState =
         if transitionDuration <= 0.0f then
@@ -261,30 +138,20 @@ module Screens =
                 { currentState with transition = Some updatedTransition }
         | None -> currentState
     /// Screens.update -> use for game update.
-    let update (currentState: ScreenState) (input: InputState) (deltaTime: float32) =
+    let update (currentState: ScreenState) (state: GameState) (input: InputState) (deltaTime: float32) =
         match currentState.transition with
-        | Some _ -> (updateTransition currentState deltaTime, Some UI.Blocked)
+        | Some _ -> updateTransition currentState deltaTime, (Some UI.Blocked, NoStateChange)
         | None ->
-            match getNextAction currentState.state input with
-            | _, Some(UI.Moveto next) -> 
-                match getTransition currentState.state next with
-                | Some (transitionType, transitionDuration) -> 
-                    (updateState currentState next transitionDuration transitionType, Some UI.Blocked)
-                | None -> (currentState, None)
+            match getNextAction currentState.state state input with
+            | _, (Some(UI.Moveto (next, transition)), statechange) -> 
+                updateState currentState next transition.duration transition.transitionType, (Some UI.Blocked, statechange)
             | buttonState, action ->
-                let newScreenState = {currentState with buttonState = buttonState}
-                (newScreenState, action)
+                let newScreenState = { currentState with buttonState = buttonState }
+                newScreenState, action
                 
 
 
 
-    /// Draws the current screen with offset for transition
-    let drawScreen (context: DrawContext) (screen: GameScreen) (buttonState: (int * UI.ButtonCurrent) option) (playState: GameState) (offset: Vector2) =
-        match screen with
-        | BlackScreen v -> DrawUI.drawBlackScreen context v offset
-        | MainMenu -> DrawUI.screenDraw context ScreenMap.MainMenu buttonState offset
-        | StageSelect v -> DrawUI.screenDraw context (ScreenMap.StageSelect v) buttonState offset
-        | _ -> DrawUI.drawBlackScreen context 1.0f offset
 
     /// Draws the current screen and the transition effect if there is a transition
     let draw (context: DrawContext) (screenState: ScreenState) (playState: GameState) =
