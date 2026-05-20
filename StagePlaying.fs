@@ -502,11 +502,11 @@ module InStage =
         let movement, _ = gameMove
         movement |> List.iter (fun move -> StageObject.moveClearOnPos move stage)
     
-    let update (action: KeyBind) (stage: InStage) (deltaTime: float32): InStage * bool = 
-        match stage.moveTime with
-        | Some movetime when System.Single.IsInfinity movetime -> 
-            { stage with fullTimeSpent = stage.fullTimeSpent + deltaTime }, false
-        | Some movetime -> 
+    let update (someAction: KeyBind option) (stage: InStage) (deltaTime: float32): InStage = 
+        match stage.moveTime, someAction with
+        | Some movetime, _ when System.Single.IsInfinity movetime -> 
+            { stage with fullTimeSpent = stage.fullTimeSpent + deltaTime }
+        | Some movetime, _ -> 
             let nextTime = stage.moveTimeSpent - deltaTime
             if nextTime > 0.0f then
                 let timeRatio = 1.0f - nextTime/movetime
@@ -520,7 +520,7 @@ module InStage =
                     cameraPos = cameraPos
                     moveTimeSpent = nextTime; 
                     fullTimeSpent = stage.fullTimeSpent + deltaTime 
-                }, false
+                }
             else
                 updateByMovement stage.movement stage
                 let realPos = StageGrid.gridPosToVector stage.playerPos
@@ -535,8 +535,8 @@ module InStage =
                     moveTime = None; 
                     moveTimeSpent = 0.0f; 
                     fullTimeSpent = stage.fullTimeSpent + deltaTime 
-                }, false
-        | None ->
+                }
+        | None, Some action ->
             let playerResult = StagePlayer.playerResult stage
             match playerResult with
             | Passed (err, Victory) -> 
@@ -547,7 +547,7 @@ module InStage =
                     moveTime = Some movetime; 
                     moveTimeSpent = movetime; 
                     fullTimeSpent = stage.fullTimeSpent + deltaTime 
-                }, false
+                }
             | Passed (err, Dead) -> 
                 let transtime, movetime = moveTimeMap PlayerDead
                 { stage with 
@@ -556,7 +556,7 @@ module InStage =
                     moveTime = Some movetime; 
                     moveTimeSpent = movetime; 
                     fullTimeSpent = stage.fullTimeSpent + deltaTime 
-                }, false
+                }
             | Passed (err, Alive) -> 
                 match action with
                 | Move direction -> 
@@ -580,7 +580,7 @@ module InStage =
                             moveTime = Some movetime; 
                             moveTimeSpent = movetime;
                             fullTimeSpent = stage.fullTimeSpent + deltaTime 
-                        }, true
+                        }
                     | Blocked ->
                         let result2 = StageInteraction.playerInteract direction stage
                         match result2 with
@@ -595,7 +595,7 @@ module InStage =
                                 moveTime = Some movetime; 
                                 moveTimeSpent = movetime;
                                 fullTimeSpent = stage.fullTimeSpent + deltaTime 
-                            }, true
+                            }
                         | Blocked ->
                             let transtime, movetime = moveTimeMap Minor
                             { stage with 
@@ -607,7 +607,7 @@ module InStage =
                                 moveTime = Some movetime; 
                                 moveTimeSpent = movetime;
                                 fullTimeSpent = stage.fullTimeSpent + deltaTime 
-                            }, true
+                            }
                         | CrashRaised err1 -> 
                             let transtime, movetime = moveTimeMap (StageCrashed err1)
                             { stage with 
@@ -619,7 +619,7 @@ module InStage =
                                 moveTime = Some movetime; 
                                 moveTimeSpent = movetime;
                                 fullTimeSpent = stage.fullTimeSpent + deltaTime 
-                            }, true
+                            }
                     | CrashRaised err1 ->
                         let transtime, movetime = moveTimeMap (StageCrashed err1)
                         { stage with 
@@ -631,7 +631,7 @@ module InStage =
                             moveTime = Some movetime; 
                             moveTimeSpent = movetime;
                             fullTimeSpent = stage.fullTimeSpent + deltaTime 
-                        }, true
+                        }
                 | GetObject when stage.inventoryFlag -> 
                     let cameraTarget = StageCore.cameraInRealPos stage.playerRealPos stage.cameraTarget stage
                     let cameraPos = StageCore.cameraTrace stage.cameraPos cameraTarget
@@ -646,7 +646,7 @@ module InStage =
                             moveTime = Some movetime; 
                             moveTimeSpent = movetime;
                             fullTimeSpent = stage.fullTimeSpent + deltaTime 
-                        }, true
+                        }
                     | Blocked ->
                         let transtime, movetime = moveTimeMap NoAction
                         { stage with 
@@ -657,7 +657,7 @@ module InStage =
                             moveTime = None; 
                             moveTimeSpent = movetime;
                             fullTimeSpent = stage.fullTimeSpent + deltaTime
-                        }, true
+                        }
                     | CrashRaised err1 -> 
                         let transtime, movetime = moveTimeMap (StageCrashed err1)
                         { stage with 
@@ -668,7 +668,7 @@ module InStage =
                             moveTime = Some movetime; 
                             moveTimeSpent = movetime;
                             fullTimeSpent = stage.fullTimeSpent + deltaTime 
-                        }, true
+                        }
                 | PutDown when stage.inventoryFlag -> 
                     let cameraTarget = StageCore.cameraInRealPos stage.playerRealPos stage.cameraTarget stage
                     let cameraPos = StageCore.cameraTrace stage.cameraPos cameraTarget
@@ -683,7 +683,7 @@ module InStage =
                             moveTime = Some movetime; 
                             moveTimeSpent = movetime;
                             fullTimeSpent = stage.fullTimeSpent + deltaTime 
-                        }, true
+                        }
                     | Blocked ->
                         let transtime, movetime = moveTimeMap NoAction
                         { stage with 
@@ -694,7 +694,7 @@ module InStage =
                             moveTime = None; 
                             moveTimeSpent = movetime;
                             fullTimeSpent = stage.fullTimeSpent + deltaTime
-                        }, true
+                        }
                     | CrashRaised err1 -> 
                         let transtime, movetime = moveTimeMap (StageCrashed err1)
                         { stage with 
@@ -705,7 +705,7 @@ module InStage =
                             moveTime = Some movetime; 
                             moveTimeSpent = movetime;
                             fullTimeSpent = stage.fullTimeSpent + deltaTime 
-                        }, true
+                        }
                 | Number v when stage.inventoryFlag ->
                     let cameraTarget = StageCore.cameraInRealPos stage.playerRealPos stage.cameraTarget stage
                     let cameraPos = StageCore.cameraTrace stage.cameraPos cameraTarget
@@ -717,13 +717,13 @@ module InStage =
                             cameraTarget = cameraTarget
                             cameraPos = cameraPos
                             fullTimeSpent = stage.fullTimeSpent + deltaTime 
-                        }, true
+                        }
                     | None ->
                         { stage with 
                             cameraTarget = cameraTarget
                             cameraPos = cameraPos
                             fullTimeSpent = stage.fullTimeSpent + deltaTime 
-                        }, false
+                        }
                 // for new Key-Button interaction
                 | _ -> 
                     let cameraTarget = StageCore.cameraInRealPos stage.playerRealPos stage.cameraTarget stage
@@ -732,8 +732,16 @@ module InStage =
                         cameraTarget = cameraTarget
                         cameraPos = cameraPos
                         fullTimeSpent = stage.fullTimeSpent + deltaTime 
-                    }, false
+                    }
             | _ -> failwith "Game Real Crashed with Unexpected State in PlayerResult. This Cannot Happen Because of PlayerResult Definition."
+        | _ ->  
+            let cameraTarget = StageCore.cameraInRealPos stage.playerRealPos stage.cameraTarget stage
+            let cameraPos = StageCore.cameraTrace stage.cameraPos cameraTarget
+            { stage with 
+                cameraTarget = cameraTarget
+                cameraPos = cameraPos
+                fullTimeSpent = stage.fullTimeSpent + deltaTime 
+            }
 
 
 

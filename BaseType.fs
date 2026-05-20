@@ -4,8 +4,10 @@ type GameScreen =
     | MainMenu
     | BlackScreen of float32
     | StageSelect of int
+    | StageBlockPopup
+    | StageLoader // blackScreen
+    | StagePlaying
     | Tutorial of int
-    | StagePlaying of int
     | PauseMenu
     | GameOver
     | BrokenScreen
@@ -55,6 +57,6 @@ type KeyBind =
 
 type TransitionType = 
     | Slide of Direction
-    | Fade
+    | Fade of float32
     | Sudden of float32
     | Popup of bool

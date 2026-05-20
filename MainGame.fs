@@ -36,8 +36,10 @@ type MainGame() as self =
         self.IsMouseVisible <- true
         self.Window.AllowUserResizing <- true
 
+
     override self.Initialize() =
         base.Initialize()
+
 
     override self.LoadContent() =
         let loadSpriteBatch = new SpriteBatch(self.GraphicsDevice)
@@ -51,6 +53,8 @@ type MainGame() as self =
         }
         loadAssets.textures.[BasePixel].SetData([|Color.White|])
         mainContext <- { spriteBatch = loadSpriteBatch; assets = loadAssets }
+    
+
     override self.Update(gameTime) =
         viewTransform <- ScaleTransform()
         let mouse = Mouse.GetState()
@@ -62,14 +66,16 @@ type MainGame() as self =
         inputState <- { mouse = mouseInput; keyboard = keyInput }
         let deltaTime = float32 gameTime.ElapsedGameTime.TotalSeconds
         
-        let newScreen, (action, gamestateChange) = Screens.update screenState playState inputState deltaTime
+        let newScreen, (action, gameStateChange) = Screens.update screenState playState inputState deltaTime
         screenState <- newScreen
         match action with
-        | Some UI.Blocked -> ()
-        | Some action -> ()
-        | None -> () //for game State change(when game playing)
-
+        | Some UI.Blocked -> []
+        | Some (UI.StageAction action) -> GameState.updateStage playState (Some action) deltaTime
+        | _ -> GameState.updateStage playState None deltaTime
+        |> GameState.stateChangeAdd gameStateChange
+        |> fun change -> playState <- GameState.update change playState
         base.Update(gameTime)
+
 
     override self.Draw(gameTime) =
         self.GraphicsDevice.Clear(Color.Black)

@@ -2,10 +2,17 @@ namespace TermProj
 
 open Microsoft.Xna.Framework
 open Microsoft.Xna.Framework.Graphics
-
 open System
 open System.IO
 
+
+
+type DetailedStageResult = {
+    victoryType: StageState
+    timeSpend: float32
+    usedBug: PatchMap
+    crashedWith: BugPatch option
+}
 
 module Stage = 
 
@@ -38,6 +45,46 @@ module Stage =
         |> fun map -> InStage.newStage map patch (stageInventoryFlag update)
     
     let Update = InStage.update
+
+    let stageResultCall (stage: InStage) = 
+        match fst stage.movement with
+        | StageVictory :: _ -> StageVictory
+        | PlayerDead :: _ -> PlayerDead
+        | StageCrashed err :: _ -> StageCrashed err
+        | _ -> NoAction
+
+    let getInStageTimeSpend (stage: InStage) = stage.fullTimeSpent
+
+    let getUsedBug (stage: InStage) = stage.usedBug
+
+    let getStageResult (stage: InStage) = 
+        let result = 
+            match stageResultCall stage with
+            | StageVictory ->
+                let usedBug = getUsedBug stage
+                let stageResult = if Set.isEmpty usedBug then Normal else Exploit
+                Some (stageResult, usedBug, None)
+            | StageCrashed err -> 
+                let usedBug = getUsedBug stage
+                Some (Crash, usedBug, Some err)
+            | _ -> None
+        match result with
+        | None -> None
+        | Some (result, bug, err) ->
+            let timeSpend = getInStageTimeSpend stage
+            Some {
+                victoryType = result
+                timeSpend = timeSpend
+                usedBug = bug
+                crashedWith = err
+            }
+    
+    let getNextUpdate (bugSet: PatchMap) = 
+        if Set.isEmpty bugSet then None
+        else
+            let bugArr = Set.toArray bugSet
+            let rIdx = System.Random().Next(bugArr.Length)
+            Some bugArr[rIdx]
 
 
 
