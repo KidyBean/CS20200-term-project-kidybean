@@ -100,7 +100,7 @@ module Screens =
             let buttonState = InteractUI.getButtonState ScreenMap.MainMenu input
             let action = InteractUI.tryNextScreenAction ScreenMap.MainMenu (ScreenMap.MainMenuInteract state) input
             (buttonState, action)
-        | _ -> None, (None, NoStateChange)
+        | _ -> None, (None, [])
     
     /// Draws the current screen with offset for transition
     let drawScreen (context: DrawContext) (screen: GameScreen) (buttonState: (int * UI.ButtonCurrent) option) (playState: GameState) (offset: Vector2) =
@@ -140,7 +140,7 @@ module Screens =
     /// Screens.update -> use for game update.
     let update (currentState: ScreenState) (state: GameState) (input: InputState) (deltaTime: float32) =
         match currentState.transition with
-        | Some _ -> updateTransition currentState deltaTime, (Some UI.Blocked, NoStateChange)
+        | Some _ -> updateTransition currentState deltaTime, (Some UI.Blocked, [])
         | None ->
             match getNextAction currentState.state state input with
             | _, (Some(UI.Moveto (next, transition)), statechange) -> 

@@ -39,6 +39,10 @@ module Stage =
     
     let Update = InStage.update
 
+
+
+    
+
     let drawDefault (context: DrawContext) (pos: Vector2) (color: Color) = 
         let shape = AssetMap.getDefaultTexture context
         let scale = Vector2(float32 GameCore.BlockSize, float32 GameCore.BlockSize)

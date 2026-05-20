@@ -724,6 +724,7 @@ module InStage =
                             cameraPos = cameraPos
                             fullTimeSpent = stage.fullTimeSpent + deltaTime 
                         }, false
+                // for new Key-Button interaction
                 | _ -> 
                     let cameraTarget = StageCore.cameraInRealPos stage.playerRealPos stage.cameraTarget stage
                     let cameraPos = StageCore.cameraTrace stage.cameraPos cameraTarget

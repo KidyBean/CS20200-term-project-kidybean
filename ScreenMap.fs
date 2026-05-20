@@ -71,9 +71,9 @@ module UI =
         | Dummy
 
     type ScreenInteract = {
-        buttons: int -> UIAction option * GameStateChange
-        keys: KeyBind -> UIAction option * GameStateChange
-        handler: unit -> UIAction option * GameStateChange
+        buttons: int -> UIAction option * GameStateChange list
+        keys: KeyBind -> UIAction option * GameStateChange list
+        handler: unit -> UIAction option * GameStateChange list
     }
 
     let isInButton (mousePos: Vector2) (button: ButtonInfo) =
@@ -142,11 +142,11 @@ module InteractUI =
             match interact.handler (), getClickedButton screen input with
             | (Some action, stateChange), _ -> Some action, stateChange
             | (None, _), Some buttonId -> interact.buttons buttonId
-            | (None, _), None -> None, NoStateChange
+            | (None, _), None -> None, []
         match handlerButtonResult, input.keyboard.curKey with
         | (Some action, stateChange), _ -> Some action, stateChange
         | (None, _), Some key when input.keyboard.prevKey <> Some key -> interact.keys key
-        | _, _ -> None, NoStateChange
+        | _, _ -> None, []
 
 /// On ScreenMap.fs
 module ScreenMap = 
@@ -198,12 +198,12 @@ module ScreenMap =
     
 
     let MainMenuButton (state: GameState) = function
-        | _ -> None, NoStateChange
+        | _ -> None, []
     let MainMenuKey (state: GameState) = function
-        | Confirm -> Some (UI.Moveto (GameScreen.StageSelect 0, { transitionType = Fade; duration = 0.8f })), NoStateChange
-        | _ -> None, NoStateChange
+        | Confirm -> Some (UI.Moveto (GameScreen.StageSelect 0, { transitionType = Fade; duration = 0.8f })), []
+        | _ -> None, []
     let MainMenuHandler (state: GameState) () =
-        None, NoStateChange
+        None, []
     
     /// Main Menu Interaction
     let MainMenuInteract (state: GameState): UI.ScreenInteract = {
@@ -251,12 +251,12 @@ module ScreenMap =
         { buttons = buttons; subscreens = subscreens }
     
     let StageSelectButton (state: GameState) = function
-        | _ -> None, NoStateChange
+        | _ -> None, []
     let StageSelectKey (state: GameState) = function
-        | Escape -> Some (UI.Moveto (GameScreen.MainMenu, { transitionType = Fade; duration = 0.8f })), NoStateChange
-        | _ -> None, NoStateChange
+        | Escape -> Some (UI.Moveto (GameScreen.MainMenu, { transitionType = Fade; duration = 0.8f })), []
+        | _ -> None, []
     let StageSelectHandler (state: GameState) () = 
-        None, NoStateChange
+        None, []
 
     let StageSelectCache = List.map (fun v -> (v, StageSelectBase v)) [0..GameCore.gameStage] |> Map.ofList
     let StageSelect v = StageSelectCache |> Map.find v

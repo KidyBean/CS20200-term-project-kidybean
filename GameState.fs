@@ -50,7 +50,7 @@ module GS =
 type GameState = {
     selectedStage: int
     lastPatchList: PatchMap
-    needPatchList: PatchMap
+    needPatch: BugPatch option
     tutorialPlayed: Map<int, bool>
     stagePatchList: Map<int, PatchMap>
     stageResult: GS.StageVictoryMap
@@ -59,26 +59,52 @@ type GameState = {
 
 type GameStateChange = 
     | SelectedStageChange of int
-    | PatchListSet of PatchMap
-    | NeedPatchListChange of PatchMap
+    | PatchListAdd of BugPatch
+    | NeedPatchSet of BugPatch
     | TutorialPlayedSet of int * bool
     | StagePatchListSet of int * PatchMap
     | StageResultChange of GS.StageVictoryMap
     | InStageChange of InStage option
-    | NoStateChange
 
 
 module GameState =
     let initialGameState = {
-        stageResult = Map.empty
-        lastPatchList = Set.empty
-        needPatchList = Set.empty
-        tutorialPlayed = Map.empty
-        stagePatchList = Map.empty
         selectedStage = 0
+        lastPatchList = Set.empty
+        needPatch = None
+        tutorialPlayed = Map.empty
+        stageResult = Map.empty
+        stagePatchList = Map.empty
         inStage = None
     }
+
+    /// input need to be sort by timeLine
+    /// list: [A; B; C; ...] -> timeline: A -> B -> C
+    let stateChangeMerge (changeList: GameStateChange list list) = 
+        changeList
+        |> List.reduce (fun acc change -> acc @ change)
+    
+    /// for pipeline a |> GameState.stateChangeAdd b : a -> b
+    let stateChangeAdd (change2: GameState list) (change1: GameState list) = change1 @ change2
+
+    let getPresentStage (state: GameState) = state.selectedStage
+    let setSelectedStage (state: GameState) (stagenum: int) = 
+        let result = GS.howMapVictory stagenum state.stageResult
+        match result with
+        | [StageBlocked] -> []
+        | _ -> [SelectedStageChange stagenum]
+
+    let needTutorial (gameState: GameState) (stagenum: int) = 
+        match Map.tryFind stagenum gameState.tutorialPlayed with
+        | Some false | None -> true
+        | Some true -> false
+    let tutorialPlayed (stagenum: int) = TutorialPlayedSet (stagenum, true)
+
     let howMapVictory (stagenum: int) (gameState: GameState) = GS.howMapVictory stagenum gameState.stageResult
+    let addStageFlag (stagenum: int) (stageState: StageState) (gameState: GameState) = 
+        match (GS.addStageFlag stagenum stageState gameState.stageResult) with
+        | Some changed -> [StageResultChange changed]
+        | None -> []
 
     let stageResultCall (gameState: GameState) = 
         let inStage = gameState.inStage
@@ -90,14 +116,38 @@ module GameState =
             | StageCrashed err :: _ -> StageCrashed err
             | _ -> NoAction
         | None -> NoAction
+    let getInStageTimeSpend (state: GameState) = 
+        match state.inStage with
+        | Some stage -> Some stage.fullTimeSpent
+        | None -> None
+    let getUsedBug (state: GameState) = 
+        match state.inStage with
+        | Some stage -> Some stage.usedBug
+        | None -> None
+    let setLastPatch (state: GameState) (bugSet: PatchMap) = 
+        if Set.isEmpty bugSet then []
+        else
+            let bugArr = Set.toArray bugSet
+            let rIdx = System.Random().Next(bugArr.Length)
+            [NeedPatchSet bugArr[rIdx]; PatchListAdd bugArr[rIdx]]
 
-    let needTutorial (gameState: GameState) = 
-        match Map.tryFind gameState.selectedStage gameState.tutorialPlayed with
-        | Some false | None -> true
-        | Some true -> false
+    let loadStage (state: GameState) (stagenum: int) = 
+        let result = Map.tryFind stagenum state.stagePatchList
+        let stage = 
+            match result with
+            | Some patch -> Stage.Load stagenum patch
+            | None -> Stage.Load stagenum state.lastPatchList
+        [InStageChange (Some stage)]
+    /// Return Stage Change and input used
+    /// if input is not used, it can be used on next action chain (in 1 update)
+    let updateStage (state: GameState) (key: KeyBind) (deltaTime: float32) = 
+        match state.inStage with
+        | Some stage -> 
+            let stageChange, inputUsed = Stage.Update key stage deltaTime
+            [InStageChange (Some stageChange)], inputUsed
+        | None -> [], false
+    let ExitStage () = [InStageChange None]
 
-    let addStageFlag (stagenum: int) (stageState: StageState) (gameState: GameState) = 
-        match (GS.addStageFlag stagenum stageState gameState.stageResult) with
-        | Some changed -> StageResultChange changed
-        | None -> NoStateChange
+
+
     
