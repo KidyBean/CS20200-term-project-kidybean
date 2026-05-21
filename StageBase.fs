@@ -2,39 +2,12 @@ namespace TermProj
 
 open Microsoft.Xna.Framework
 
-type BugPatch = 
-    // Initial bug
-    | PlayerCollisionExploit // Exploit
-    | StagePositionOutCrash // Crashed
-    // Block Push Update
-    | WrongObjectPushExploit // Exploit
-    | ObjectCollisionExploit // Exploit
-    // Ground Update
-    | AbyssCheckExploit // Exploit
-    | WrongAbyssObjectExploit // Exploit
-    // Inventory Update
-    | WrongInventoryPutExploit // Exploit
-    | InventoryLayerStackCrash // Crash
-    | PutDownOverlapExploit // Exploit
-    // KeyAndDoorUpdate
-    | AnyKeyUsedExploit // Exploit
-
-type Update = 
-    | NoUpdate
-    | InitialStage // Stage 0 
-    | Walk
-    | PushBlock
-    | AbyssAndGround
-    | Inventory
-    | KeyAndDoor
-
 
 type PatchMap = Set<BugPatch>
 
 module GameUpdate = 
     let isPatched (bug: BugPatch) (patchMap: PatchMap) = patchMap |> Set.contains bug
     let newPatch (bug: BugPatch) (patchMap: PatchMap) = patchMap |> Set.add bug 
-
 
 type GridPosition = { X: int; Y: int } with
     static member (+) (a: GridPosition, b: GridPosition) =

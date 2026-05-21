@@ -128,10 +128,12 @@ module GameState =
         match result with
         | Some patch -> 
             let stage = Stage.Load stagenum patch
-            [InStageChange (Some stage)]
+            if Option.isSome stage then [InStageChange stage]
+            else []
         | None -> 
             let stage = Stage.Load stagenum state.lastPatchList
-            [StagePatchListSet (stagenum, state.lastPatchList); InStageChange (Some stage)]
+            if Option.isSome stage then [StagePatchListSet (stagenum, state.lastPatchList); InStageChange stage]
+            else []
     /// Return Stage Change and input used
     /// if input is not used, it can be used on next action chain (in 1 update)
     let updateStage (state: GameState) (key: KeyBind option) (deltaTime: float32) = 
@@ -141,6 +143,13 @@ module GameState =
             [InStageChange (Some stageChange)]
         | None -> []
     let ExitStage () = [InStageChange None]
+
+
+    let drawStage (context: DrawContext) (state: GameState) (offset: Vector2) = 
+        match state.inStage with
+        | Some stage -> Stage.drawGame context stage offset
+        | None -> ()
+        
 
 
     

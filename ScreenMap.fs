@@ -224,6 +224,8 @@ module DrawUI =
                 let state = if button.Id = buttonId then state else UI.Normal
                 buttonDraw context button state offset
             )
+    
+    let stageDraw (context: DrawContext) (state: GameState) (offset: Vector2) = GameState.drawStage context state offset
 
 
 
@@ -239,10 +241,15 @@ module ScreenMapBase =
         }
     ///defaultScreen
     let DefaultScreen (state: GameState): UI.ScreenUI = { buttons = []; subscreens = [] }
+    let DefaultButtons (state: GameState) = function
+        | _ -> None, []
+    let DefaultKeys (state: GameState) = function
+        | _ -> None, []
+    let DefaultHandler (state: GameState) () = None, []
     let DefaultInteract (state: GameState): UI.ScreenInteract = {
-        buttons = (fun (state: GameState) (num: int) -> None, []) state
-        keys = (fun (state: GameState) (key: KeyBind) -> None, []) state
-        handler = (fun (state: GameState) () -> None, []) state
+        buttons = DefaultButtons state
+        keys = DefaultKeys state
+        handler = DefaultHandler state
     }
     
     /// Main Menu Screen ---------------------------------------------------------------------
@@ -335,25 +342,54 @@ module ScreenMapBase =
             scale = 1.5f
             pos = UI.AlignPos (UI.CenterX, UI.Bottom)
         }
+        let levelScreenOuter: UI.InnerTexture = {
+            texture = BasePixel
+            color = Color.Navy
+            size = Vector2(560.0f, 656.0f)
+            pos = UI.AlignPos (UI.CenterX, UI.CenterY)
+        }
+        let levelScreenInner: UI.InnerTexture = {
+            texture = BasePixel
+            color = Color.Black
+            size = Vector2(544.0f, 640.0f)
+            pos = UI.AlignPos (UI.CenterX, UI.CenterY)
+        }
         let levelScreen: UI.SubScreen = {
-            inner = [UI.Text patchVerText; UI.Text DescText; UI.Text promptText]
-            pos = Vector2(340.0f, 30.0f)
-            size = Vector2(600.0f, 660.0f)
+            inner = [
+                UI.Texture levelScreenOuter
+                UI.Texture levelScreenInner
+                UI.Text patchVerText
+                UI.Text DescText
+                UI.Text promptText
+            ]
+            pos = Vector2(360.0f, 32.0f)
+            size = Vector2(560.0f, 656.0f)
+        }
+        let levelButton: UI.ButtonInfo = {
+            Id = 2
+            normalLayout = levelScreen
+            hoveredLayout = None
+            pressedLayout = None
         }
 
         
 
-
-        let leftButtonInner: UI.InnerTexture = {
+        let MoveButtonOuter: UI.InnerTexture = {
             texture = BasePixel
-            color = Color.White
-            size = Vector2(80.0f, 120.0f)
+            color = Color.Navy
+            size = Vector2(80.0f, 112.0f)
+            pos = UI.AlignPos (UI.CenterX, UI.CenterY)
+        }
+        let MoveButtonInner: UI.InnerTexture = {
+            texture = BasePixel
+            color = Color.Black
+            size = Vector2(64.0f, 96.0f)
             pos = UI.AlignPos (UI.CenterX, UI.CenterY)
         }
         let leftButtonScreen: UI.SubScreen = {
-            inner = [UI.Texture leftButtonInner]
-            pos = Vector2(220.0f, 330.0f)
-            size = Vector2(80.0f, 120.0f)
+            inner = [UI.Texture MoveButtonOuter; UI.Texture MoveButtonInner]
+            pos = Vector2(240.0f, 320.0f)
+            size = Vector2(80.0f, 112.0f)
         }
         let leftButton: UI.ButtonInfo = {
             Id = 0
@@ -365,16 +401,10 @@ module ScreenMapBase =
 
 
 
-        let rightButtonInner: UI.InnerTexture = {
-            texture = BasePixel
-            color = Color.White
-            size = Vector2(80.0f, 120.0f)
-            pos = UI.AlignPos (UI.CenterX, UI.CenterY)
-        }
         let rightButtonScreen: UI.SubScreen = {
-            inner = [UI.Texture rightButtonInner]
-            pos = Vector2(980.0f, 330.0f)
-            size = Vector2(80.0f, 120.0f)
+            inner = [UI.Texture MoveButtonOuter; UI.Texture MoveButtonInner]
+            pos = Vector2(960.0f, 320.0f)
+            size = Vector2(80.0f, 112.0f)
         }
         let rightButton: UI.ButtonInfo = {
             Id = 1
@@ -384,9 +414,9 @@ module ScreenMapBase =
         }
         
 
-        let subscreens = [levelScreen]
+        let subscreens = []
         let buttons = if v = 0 then [rightButton] else [leftButton; rightButton]
-        { buttons = buttons; subscreens = subscreens }
+        { buttons = levelButton :: buttons; subscreens = subscreens }
 
 
     let _goPrev (state: GameState) = 
@@ -395,24 +425,24 @@ module ScreenMapBase =
         else
             let nextStage = presentStage - 1
             match GameState.setSelectedStage state nextStage with
-            | [] -> Some (UI.Moveto(GameScreen.StageBlockPopup, { transitionType = Popup true; duration = 0.5f })), []
+            | [] -> Some (UI.Moveto(GameScreen.StageBlockPopup, { transitionType = Popup true; duration = 0.3f })), []
             | v -> Some (UI.Moveto (GameScreen.StageSelect nextStage, { transitionType = Slide R; duration = 0.8f })), v
     let _goNext (state: GameState) = 
         let presentStage = GameState.getPresentStage state
         let nextStage = presentStage + 1
         match GameState.setSelectedStage state nextStage with
-        | [] -> Some (UI.Moveto(GameScreen.StageBlockPopup, { transitionType = Popup true; duration = 0.5f })), []
+        | [] -> Some (UI.Moveto(GameScreen.StageBlockPopup, { transitionType = Popup true; duration = 0.3f })), []
         | v -> Some (UI.Moveto (GameScreen.StageSelect nextStage, { transitionType = Slide L; duration = 0.8f })), v
     let StageSelectButton (state: GameState) = function
         | 0 -> _goPrev state
         | 1 -> _goNext state
-        | 2 -> None, []
+        | 2 -> Some (UI.Moveto (GameScreen.StageLoader, { transitionType = Fade 1.0f; duration = 0.4f })), []
         | _ -> None, []
     let StageSelectKey (state: GameState) = function
         | Escape -> Some (UI.Moveto (GameScreen.MainMenu, { transitionType = Fade 0.5f; duration = 0.8f })), []
         | Move R -> _goNext state
         | Move L -> _goPrev state
-        | Confirm -> None, []
+        | Confirm -> Some (UI.Moveto (GameScreen.StageLoader, { transitionType = Fade 1.0f; duration = 0.4f })), []
         | _ -> None, []
     let StageSelectHandler (state: GameState) () = 
         None, []
@@ -467,16 +497,22 @@ module ScreenMapBase =
 
 
 
-        let buttonTexture: UI.InnerTexture = {
+        let buttonOuter: UI.InnerTexture = {
             texture = BasePixel
             color = Color.Navy
-            size = Vector2(48.0f, 48.0f)
+            size = Vector2(56.0f, 56.0f)
+            pos = UI.AlignPos (UI.CenterX, UI.CenterY)
+        }
+        let buttonInner: UI.InnerTexture = {
+            texture = BasePixel
+            color = Color.Black
+            size = Vector2(40.0f, 40.0f)
             pos = UI.AlignPos (UI.CenterX, UI.CenterY)
         }
         let button: UI.SubScreen = {
-            inner = [UI.Texture buttonTexture]
-            pos = Vector2(968.0f, 120.0f)
-            size = Vector2(48.0f, 48.0f)
+            inner = [UI.Texture buttonOuter; UI.Texture buttonInner]
+            pos = Vector2(960.0f, 120.0f)
+            size = Vector2(56.0f, 56.0f)
         }
 
         let PopupButton: UI.ButtonInfo = {
@@ -500,14 +536,98 @@ module ScreenMapBase =
     let StageBlockPopupScreen (state: GameState): UI.ScreenUI = StageBlockPopupBase
     /// Main Menu Interaction
     let StageBlockPopupInteract (state: GameState): UI.ScreenInteract = {
-            buttons = StageBlockPopupButton state
-            keys = StageBlockPopupKey state
-            handler = StageBlockPopupHandler state
+        buttons = StageBlockPopupButton state
+        keys = StageBlockPopupKey state
+        handler = StageBlockPopupHandler state
     }
 
 
 
 
+
+
+    /// Stage Loader ----------------------------------------------------------------
+    let StageLoaderHandler (state: GameState) () = 
+        let stagenum = GameState.getPresentStage state
+        let change = GameState.loadStage state stagenum
+        if List.isEmpty change then
+            Some (UI.Moveto(GameScreen.StageBlockPopup, { transitionType = Popup true; duration = 0.3f })), []
+        else
+            let action = UI.Moveto (GameScreen.StagePlaying, { transitionType = Fade 0.0f; duration = 0.4f })
+            Some action, change
+    let StageLoaderScreen (state: GameState): UI.ScreenUI = DefaultScreen state
+    let StageLoaderInteract (state: GameState): UI.ScreenInteract = {
+        buttons = DefaultButtons state
+        keys = DefaultKeys state
+        handler = StageLoaderHandler state
+    }
+
+
+
+
+
+
+    /// Stage Playing ----------------------------------------------------------------
+    let StagePlayingBase: UI.ScreenUI = 
+        let buttonOuter: UI.InnerTexture = {
+            texture = BasePixel
+            color = Color.Navy
+            size = Vector2(56.0f, 56.0f)
+            pos = UI.AlignPos (UI.CenterX, UI.CenterY)
+        }
+        let buttonInner: UI.InnerTexture = {
+            texture = BasePixel
+            color = Color.Black
+            size = Vector2(40.0f, 40.0f)
+            pos = UI.AlignPos (UI.CenterX, UI.CenterY)
+        }
+        let OverButton: UI.SubScreen = {
+            inner = [UI.Texture buttonOuter; UI.Texture buttonInner]
+            pos = Vector2(1192.0f, 32.0f)
+            size = Vector2(56.0f, 56.0f)
+        }
+        let UnderButton: UI.SubScreen = {
+            inner = [UI.Texture buttonOuter; UI.Texture buttonInner]
+            pos = Vector2(1192.0f, 120.0f)
+            size = Vector2(56.0f, 56.0f)
+        }
+        let tutorialButton: UI.ButtonInfo = {
+            Id = 0
+            normalLayout = UnderButton
+            hoveredLayout = None
+            pressedLayout = None
+            
+        }
+        let pauseButton: UI.ButtonInfo = {
+            Id = 1
+            normalLayout = OverButton
+            hoveredLayout = None
+            pressedLayout = None
+        }
+        let subscreens = []
+        let buttons = [tutorialButton; pauseButton]
+        { buttons = buttons; subscreens = subscreens }
+    let StagePlayingButton (state: GameState) = function
+        | _ -> None, []
+    let StagePlayingKey (state: GameState) = function
+        | _ -> None, []
+    let StagePlayingHandler (state: GameState) () =
+        None, []
+    
+    let StagePlayingScreen (state: GameState): UI.ScreenUI = StagePlayingBase
+    /// Main Menu Interaction
+    let StagePlayingInteract (state: GameState): UI.ScreenInteract = {
+        buttons = StageBlockPopupButton state
+        keys = StageBlockPopupKey state
+        handler = StageBlockPopupHandler state
+    }
+
+
+
+
+
+
+    /// PatchNote ----------------------------------------------------------------
 
 
 
@@ -535,6 +655,7 @@ module ScreenMap =
         | MainMenu -> ScreenMapBase.MainMenuScreen state
         | StageSelect v -> ScreenMapBase.StageSelectScreen state v
         | StageBlockPopup -> ScreenMapBase.StageBlockPopupScreen state
+        | StageLoader -> ScreenMapBase.StageLoaderScreen state
         | _ -> ScreenMapBase.DefaultScreen state
     
     let interactMap (screen: GameScreen) (state: GameState) = 
@@ -542,6 +663,7 @@ module ScreenMap =
         | MainMenu -> ScreenMapBase.MainMenuInteract  state
         | StageSelect _ -> ScreenMapBase.StageSelectInteract state
         | StageBlockPopup -> ScreenMapBase.StageBlockPopupInteract state
+        | StageLoader -> ScreenMapBase.StageLoaderInteract state
         | _ -> ScreenMapBase.DefaultInteract state
 
     /// Get next action from input and gamescreen
@@ -556,6 +678,10 @@ module ScreenMap =
     let drawScreen (context: DrawContext) (screen: GameScreen) (buttonState: (int * UI.ButtonCurrent) option) (state: GameState) (offset: Vector2) =
         match screen with
         | BlackScreen v -> DrawUI.drawBlackScreen context v offset
+        | StagePlaying ->
+            let screenUI = screenMap StagePlaying state
+            DrawUI.stageDraw context state offset
+            DrawUI.screenDraw context screenUI buttonState offset
         | gameScreen ->
             let screenUI = screenMap gameScreen state
             DrawUI.screenDraw context screenUI buttonState offset

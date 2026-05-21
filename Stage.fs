@@ -40,9 +40,12 @@ module Stage =
     let Load (num: int) (patch: PatchMap) = 
         let path = stageToPath num
         let update = stageUpdate num
-        File.ReadAllText(path)
-        |> fun map -> StageParser.makeCompactStage map (stageGroundFlag update)
-        |> fun map -> InStage.newStage map patch (stageInventoryFlag update)
+        if File.Exists(path) then
+            File.ReadAllText(path)
+            |> fun map -> StageParser.makeCompactStage map (stageGroundFlag update)
+            |> fun map -> InStage.newStage map patch (stageInventoryFlag update)
+            |> Some
+        else None
     
     let Update = InStage.update
 
@@ -95,10 +98,10 @@ module Stage =
         let scale = Vector2(float32 GameCore.BlockSize, float32 GameCore.BlockSize)
         context.spriteBatch.Draw(shape, pos, System.Nullable<Rectangle>(), color, 0.0f, Vector2.Zero, scale, SpriteEffects.None, 0.0f)
 
-    let drawObject (context: DrawContext) (object: ObjectType) (spec: AssetMap.AssetSpec) (pos: Vector2) = 
+    let drawObject (context: DrawContext) (object: ObjectType) (spec: AssetMap.AssetSpec) (pos: Vector2) (offset: Vector2) = 
         let textureID = AssetMap.ObjectTexture object spec
         let someTexture = Map.tryFind textureID context.assets.textures
-        let pixel = Vector2(pos.X*float32 GameCore.BlockSize, pos.Y*float32 GameCore.BlockSize)
+        let pixel = Vector2(pos.X*float32 GameCore.BlockSize, pos.Y*float32 GameCore.BlockSize) + offset
         let idx = 
             match object with
             | Key idx -> idx
@@ -111,10 +114,10 @@ module Stage =
             context.spriteBatch.Draw(texture, pixel, System.Nullable<Rectangle>(), color, 0.0f, Vector2.Zero, scale, SpriteEffects.None, 0.0f)
         | None -> drawDefault context pixel color
     
-    let drawGround (context: DrawContext) (ground: GroundType) (spec: AssetMap.AssetSpec) (pos: Vector2) = 
+    let drawGround (context: DrawContext) (ground: GroundType) (spec: AssetMap.AssetSpec) (pos: Vector2) (offset: Vector2) = 
         let textureID = AssetMap.GroundTexture ground spec
         let someTexture = Map.tryFind textureID context.assets.textures
-        let pixel = Vector2(pos.X*float32 GameCore.BlockSize, pos.Y*float32 GameCore.BlockSize)
+        let pixel = Vector2(pos.X*float32 GameCore.BlockSize, pos.Y*float32 GameCore.BlockSize) + offset
         let idx = 
             match ground with
             | ObjectGround (Key idx) -> idx
@@ -140,7 +143,7 @@ module Stage =
             ]
         | _ -> AssetMap.NoSpec
 
-    let drawCellInIteration (context: DrawContext) (pos: GridPosition) (objects: ObjectType[]) (stage: InStage) = 
+    let drawCellInIteration (context: DrawContext) (pos: GridPosition) (objects: ObjectType[]) (stage: InStage) (offset: Vector2) = 
         let realPos = StageGrid.gridPosToVector pos - stage.cameraPos
         objects
         |> Array.iter (fun object ->
@@ -148,16 +151,16 @@ module Stage =
                 | Empty -> ()
                 | _ ->
                     let spec = getSpec pos object stage
-                    drawObject context object spec realPos
+                    drawObject context object spec realPos offset
             )
 
-    let drawGroundInIteration (context: DrawContext) (pos: GridPosition) (ground: GroundType) (stage: InStage) = 
+    let drawGroundInIteration (context: DrawContext) (pos: GridPosition) (ground: GroundType) (stage: InStage) (offset: Vector2) = 
         let realPos = StageGrid.gridPosToVector pos - stage.cameraPos
         match ground with
-        | Ground -> drawGround context ground AssetMap.NoSpec realPos
+        | Ground -> drawGround context ground AssetMap.NoSpec realPos offset
         | _ ->
             let upper = pos + { X = 0; Y = -1 }
-            if StageGrid.isPosOutOfStage upper stage.stageMap then drawGround context ground AssetMap.NoSpec realPos
+            if StageGrid.isPosOutOfStage upper stage.stageMap then drawGround context ground AssetMap.NoSpec realPos offset
             else
                 let upperGround = StageGrid.groundOnPos upper stage.stageMap
                 let baseGround = if ground = AbyssGround then AbyssGround else Abyss
@@ -166,12 +169,12 @@ module Stage =
                     | ObjectGround object -> AssetMap.UpperObject object
                     | Ground -> AssetMap.Upper Ground
                     | _ -> AssetMap.NoSpec
-                drawGround context baseGround spec realPos
+                drawGround context baseGround spec realPos offset
             match ground with
-            | ObjectGround object -> drawGround context ground AssetMap.NoSpec realPos
+            | ObjectGround object -> drawGround context ground AssetMap.NoSpec realPos offset
             | _ -> ()
 
-    let drawObjectMove (context: DrawContext) (gamemove: GameMove) (movetime: float32) (stage: InStage) = 
+    let drawObjectMove (context: DrawContext) (gamemove: GameMove) (movetime: float32) (stage: InStage) (offset: Vector2) = 
         match gamemove, stage.moveTime with
         | ObjectMove (objects, from, goto), Some gameTime when movetime <> 0.0f ->
             let delta = StageGrid.gridPosToVector (goto - from)
@@ -181,12 +184,12 @@ module Stage =
             |> Array.iter (fun object ->
                     match object with
                     | Empty -> ()
-                    | Player -> drawObject context object (AssetMap.SpecDirection stage.playerDirection) realPos
-                    | _ -> drawObject context object AssetMap.NoSpec realPos
+                    | Player -> drawObject context object (AssetMap.SpecDirection stage.playerDirection) realPos offset
+                    | _ -> drawObject context object AssetMap.NoSpec realPos offset
                 )
         | _ -> ()
     
-    let drawStage (context: DrawContext) (stage: InStage) = 
+    let drawStage (context: DrawContext) (stage: InStage) (offset: Vector2) = 
         let (minX, maxX), (minY, maxY) = StageCore.rangeDrawBlock stage
         let stageMap = stage.stageMap
         for x in minX..maxX do
@@ -194,11 +197,15 @@ module Stage =
                 let pos = { X = x; Y = y }
                 let ground = StageGrid.groundOnPos pos stageMap
                 let objects = StageGrid.objectOnPos pos stageMap
-                drawGroundInIteration context pos ground stage
-                drawCellInIteration context pos objects stage
+                drawGroundInIteration context pos ground stage offset
+                drawCellInIteration context pos objects stage offset
         let movelist, time = stage.movement
-        movelist |> List.iter (fun gmove -> drawObjectMove context gmove time stage)
+        movelist |> List.iter (fun gmove -> drawObjectMove context gmove time stage offset)
 
-    let drawInventory (context: DrawContext) (stage: InStage) = 
+    let drawInventory (context: DrawContext) (stage: InStage) (offset: Vector2) = 
         ()
+    
+    let drawGame (context: DrawContext) (stage: InStage) (offset: Vector2) = 
+        drawStage context stage offset
+        drawInventory context stage offset
 

@@ -60,3 +60,28 @@ type TransitionType =
     | Fade of float32
     | Sudden of float32
     | Popup of bool
+
+type Update = 
+    | InitialStage // Stage 0 
+    | Walk
+    | PushBlock
+    | AbyssAndGround
+    | Inventory
+    | KeyAndDoor
+
+type BugPatch = 
+    // Initial bug
+    | PlayerCollisionExploit // Exploit
+    | StagePositionOutCrash // Crashed
+    // Block Push Update
+    | WrongObjectPushExploit // Exploit
+    | ObjectCollisionExploit // Exploit
+    // Ground Update
+    | AbyssCheckExploit // Exploit
+    | WrongAbyssObjectExploit // Exploit
+    // Inventory Update
+    | WrongInventoryPutExploit // Exploit
+    | InventoryLayerStackCrash // Crash
+    | PutDownOverlapExploit // Exploit
+    // KeyAndDoorUpdate
+    | AnyKeyUsedExploit // Exploit
