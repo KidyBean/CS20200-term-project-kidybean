@@ -14,6 +14,8 @@ type GameMove =
 
 type InStage = {
     patch: PatchMap
+    pushFlag: bool
+    inventoryFlag: bool
     playerPos: GridPosition
     prevPlayerPos: GridPosition
     playerRealPos: Vector2
@@ -21,7 +23,6 @@ type InStage = {
     cameraTarget: Vector2
     cameraPos: Vector2
     stageMap: StageGrid
-    inventoryFlag: bool
     inventory: ObjectType[]
     selectedIdx: int
     usedBug: BugPatch Set
@@ -66,11 +67,13 @@ module StageObject =
         | Flag -> Some CanMakePlayerGoal
         | _ -> None
 
-    let moveToPos (prev: GridPosition) (next: GridPosition) (stage: InStage) = 
+    let moveToPos (prev: GridPosition) (next: GridPosition) (stage: InStage) (isPlayer: bool) = 
         let stageMap = stage.stageMap
         let patchList = stage.patch
         let targetObjects = stageMap |> StageGrid.objectOnPos prev
-        let targetIdx = if Option.isSome ((|CanGoThrough|_|) targetObjects[0]) then 1 else 0
+        let targetIdx = 
+            if isPlayer then Array.findIndex (fun x -> x = Player) targetObjects
+            elif Option.isSome ((|CanGoThrough|_|) targetObjects[0]) then 1 else 0
         let targetObject = targetObjects[targetIdx]
 
         let canMoveTarget =
@@ -95,22 +98,22 @@ module StageObject =
             let posObjects = stageMap |> StageGrid.objectOnPos next
             let posIdx, posRemain = if Option.isSome ((|CanGoThrough|_|) posObjects[0]) then 1, true else 0, false
             let movableObject = targetObjects[targetIdx..] |> Array.filter (fun x -> x <> Empty)
-            let pushBackObject = if targetIdx = 1 then targetObjects[0] else Empty
+            let pushBackObject = if targetIdx >= 1 then targetObjects[..targetIdx - 1] else [|Empty|]
             match posObjects[posIdx], targetObject with
             | Empty, Player | Empty, CanPush -> 
-                StageGrid.pushObjects [|pushBackObject|] prev stage.stageMap false
+                StageGrid.pushObjects pushBackObject prev stage.stageMap false
                 Passed (Set.empty, movableObject)
         
             | _, Player when not (Set.contains PlayerCollisionExploit patchList) -> 
-                StageGrid.pushObjects [|pushBackObject|] prev stage.stageMap false
+                StageGrid.pushObjects pushBackObject prev stage.stageMap false
                 Passed (Set [PlayerCollisionExploit], movableObject)
         
             | _, CanPush when not (Set.contains ObjectCollisionExploit patchList) ->
-                StageGrid.pushObjects [|pushBackObject|] prev stage.stageMap false
+                StageGrid.pushObjects pushBackObject prev stage.stageMap false
                 Passed (Set [ObjectCollisionExploit], movableObject)
         
             | _, _ when not (Set.contains WrongObjectPushExploit patchList) -> 
-                StageGrid.pushObjects [|pushBackObject|] prev stage.stageMap false
+                StageGrid.pushObjects pushBackObject prev stage.stageMap false
                 Passed (Set [WrongObjectPushExploit], movableObject)
         
             | _,  _ -> Blocked
@@ -266,10 +269,13 @@ module StagePlayer =
             else CrashRaised StagePositionOutCrash
         else
             let objectAfterPos = objectPos + deltaPos
-            let result = StageObject.moveToPos objectPos objectAfterPos stage
+            let result = 
+                if stage.pushFlag then StageObject.moveToPos objectPos objectAfterPos stage false
+                else Passed (Set.empty, [||])
             match result with
             | Passed (err, objectList) ->
-                let result = StageObject.moveToPos playerPos objectPos stage
+                let result = 
+                    StageObject.moveToPos playerPos objectPos stage true
                 match result with
                 | Passed (err2, objectList2) ->
                     if Array.isEmpty objectList then
@@ -452,7 +458,7 @@ module StageCore =
         let centerY = 
             match realPos.Y - DamperY > 0.0f, realPos.Y + DamperY < maxY with
             | true, true ->
-                if cameraPos.Y + DeadZone.X < realPos.Y || cameraPos.Y - DeadZone.X > realPos.Y then realPos.Y
+                if cameraPos.Y + DeadZone.Y < realPos.Y || cameraPos.Y - DeadZone.X > realPos.Y then realPos.Y
                 else cameraPos.Y
             | true, false -> maxY - DamperY
             | false, true -> DamperY
@@ -475,12 +481,14 @@ module InStage =
         | PlayerDead -> 0.0f, infinityf
         | StageCrashed _ -> 0.0f, infinityf
 
-    let newStage (map: CompactGrid) (patchMap: PatchMap) (inventoryFlag: bool) = 
-        let stageGrid, playerPos = StageGrid.makeStageGrid map
+    let newStage (map: CompactGrid) (patchMap: PatchMap) (pushBlockFlag: bool) (isNoGround: bool) (inventoryFlag: bool) = 
+        let stageGrid, playerPos = StageGrid.makeStageGrid map isNoGround
         let camera = StageCore.centerinStartPos playerPos stageGrid
         
         {
             patch = patchMap
+            pushFlag = pushBlockFlag
+            inventoryFlag = inventoryFlag
             playerPos = playerPos
             prevPlayerPos = playerPos
             playerRealPos = StageGrid.gridPosToVector playerPos
@@ -488,7 +496,6 @@ module InStage =
             cameraPos = camera
             playerDirection = Direction.R
             stageMap = stageGrid
-            inventoryFlag = inventoryFlag
             inventory = if inventoryFlag then Array.create GameCore.InventoryStack Empty else [||]
             selectedIdx = 0
             usedBug = Set.empty
@@ -503,10 +510,10 @@ module InStage =
         movement |> List.iter (fun move -> StageObject.moveClearOnPos move stage)
     
     let update (someAction: KeyBind option) (stage: InStage) (deltaTime: float32): InStage = 
-        match stage.moveTime, someAction with
-        | Some movetime, _ when System.Single.IsInfinity movetime -> 
+        match stage.moveTime with
+        | Some movetime when System.Single.IsInfinity movetime -> 
             { stage with fullTimeSpent = stage.fullTimeSpent + deltaTime }
-        | Some movetime, _ -> 
+        | Some movetime -> 
             let nextTime = stage.moveTimeSpent - deltaTime
             if nextTime > 0.0f then
                 let timeRatio = 1.0f - nextTime/movetime
@@ -536,7 +543,7 @@ module InStage =
                     moveTimeSpent = 0.0f; 
                     fullTimeSpent = stage.fullTimeSpent + deltaTime 
                 }
-        | None, Some action ->
+        | None ->
             let playerResult = StagePlayer.playerResult stage
             match playerResult with
             | Passed (err, Victory) -> 
@@ -558,8 +565,8 @@ module InStage =
                     fullTimeSpent = stage.fullTimeSpent + deltaTime 
                 }
             | Passed (err, Alive) -> 
-                match action with
-                | Move direction -> 
+                match someAction with
+                | Some (Move direction) -> 
                     let cameraTarget = StageCore.cameraInRealPos stage.playerRealPos stage.cameraTarget stage
                     let cameraPos = StageCore.cameraTrace stage.cameraPos cameraTarget
                     let result1 = StagePlayer.playerMove direction stage
@@ -632,7 +639,7 @@ module InStage =
                             moveTimeSpent = movetime;
                             fullTimeSpent = stage.fullTimeSpent + deltaTime 
                         }
-                | GetObject when stage.inventoryFlag -> 
+                | Some GetObject when stage.inventoryFlag -> 
                     let cameraTarget = StageCore.cameraInRealPos stage.playerRealPos stage.cameraTarget stage
                     let cameraPos = StageCore.cameraTrace stage.cameraPos cameraTarget
                     match StageInventory.inventoryGet stage with
@@ -669,7 +676,7 @@ module InStage =
                             moveTimeSpent = movetime;
                             fullTimeSpent = stage.fullTimeSpent + deltaTime 
                         }
-                | PutDown when stage.inventoryFlag -> 
+                | Some PutDown when stage.inventoryFlag -> 
                     let cameraTarget = StageCore.cameraInRealPos stage.playerRealPos stage.cameraTarget stage
                     let cameraPos = StageCore.cameraTrace stage.cameraPos cameraTarget
                     match StageInventory.inventoryPut stage with
@@ -706,7 +713,7 @@ module InStage =
                             moveTimeSpent = movetime;
                             fullTimeSpent = stage.fullTimeSpent + deltaTime 
                         }
-                | Number v when stage.inventoryFlag ->
+                | Some (Number v) when stage.inventoryFlag ->
                     let cameraTarget = StageCore.cameraInRealPos stage.playerRealPos stage.cameraTarget stage
                     let cameraPos = StageCore.cameraTrace stage.cameraPos cameraTarget
                     let result = StageInventory.inventorySelect (v - 1)
@@ -734,14 +741,6 @@ module InStage =
                         fullTimeSpent = stage.fullTimeSpent + deltaTime 
                     }
             | _ -> failwith "Game Real Crashed with Unexpected State in PlayerResult. This Cannot Happen Because of PlayerResult Definition."
-        | _ ->  
-            let cameraTarget = StageCore.cameraInRealPos stage.playerRealPos stage.cameraTarget stage
-            let cameraPos = StageCore.cameraTrace stage.cameraPos cameraTarget
-            { stage with 
-                cameraTarget = cameraTarget
-                cameraPos = cameraPos
-                fullTimeSpent = stage.fullTimeSpent + deltaTime 
-            }
 
 
 

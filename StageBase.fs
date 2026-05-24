@@ -48,9 +48,9 @@ module StageGrid =
         | L -> { X = -1; Y = 0 }
         | R -> { X = 1; Y = 0 }
     
-    let newGrid (width: int) (height: int) : StageGrid = 
+    let newGrid (width: int) (height: int) (defaultGround: GroundType) : StageGrid = 
         let newObjectGrid = Array3D.create (GameCore.objectLayer + 1) width height Empty
-        let newGroundGrid = Array2D.create width height Abyss
+        let newGroundGrid = Array2D.create width height defaultGround
         {
             objectLayer = GameCore.objectLayer
             width = width
@@ -67,13 +67,13 @@ module StageGrid =
     let objectOnPos (pos: GridPosition) (stage: StageGrid) = 
         let layer = stage.objectLayer + 1
         let objectArr = Array.create layer Empty
-        for l in 0..layer do
+        for l in 0..layer - 1 do
             let object = stage.objects[l, pos.X, pos.Y]
             objectArr[l] <- object
         objectArr
     
     let rec private _isObjectInPos (pos: GridPosition) (object: ObjectType) (stage: StageGrid) (layer: int) = 
-        if layer >= stage.objectLayer then false
+        if layer > stage.objectLayer then false
         else
             match stage.objects[layer, pos.X, pos.Y] with
             | Empty -> false
@@ -95,9 +95,10 @@ module StageGrid =
     let pushObjects (rawObject: ObjectType[]) (pos: GridPosition) (stage: StageGrid) (isBaseRemain: bool) = 
         let objects = rawObject |> Array.filter (fun x -> x <> Empty)
         let numObjects = Array.length objects
+        for idx in 0..stage.objectLayer do putObject Empty idx pos stage
         if numObjects > 0 then
             if isBaseRemain then
-                let rawOffset = numObjects - stage.objectLayer
+                let rawOffset = numObjects - (stage.objectLayer + 1)
                 let offset = if rawOffset > 0 then rawOffset else 0
                 putObject objects[0] 0 pos stage
                 for idx in 1..stage.objectLayer do
@@ -113,14 +114,16 @@ module StageGrid =
                         putObject objects[idx + offset] idx pos stage
                     else
                         putObject Empty idx pos stage
+                putObject Empty stage.objectLayer pos stage
         
     let putObjectToGround (object: ObjectType) (pos: GridPosition) (stage: StageGrid) = 
         match object with
         | Empty -> stage.ground[pos.X, pos.Y] <- Abyss
         | _ -> stage.ground[pos.X, pos.Y] <- ObjectGround object
 
-    let makeStageGrid (compactMap: CompactGrid) = 
-        let stageGrid = newGrid (compactMap.width + 2*GameCore.GridPadding) (compactMap.height + 2*GameCore.GridPadding)
+    let makeStageGrid (compactMap: CompactGrid) (isNoGround: bool) = 
+        let abyss = if isNoGround then AbyssGround else Abyss
+        let stageGrid = newGrid (compactMap.width + 2*GameCore.GridPadding) (compactMap.height + 2*GameCore.GridPadding) abyss
         for x in 0..compactMap.width - 1 do
             for y in 0..compactMap.height - 1 do
                 stageGrid.objects[0, x + GameCore.GridPadding, y + GameCore.GridPadding] <- compactMap.objects[x, y]

@@ -28,6 +28,10 @@ module Stage =
     let stageInventoryFlag (update: Update List) = List.contains Inventory update
     let stageGroundFlag (update: Update List) = List.contains AbyssAndGround update
 
+    let stagePushFlag (update: Update List) = List.contains PushBlock update
+
+    let lastUpdate (num: int) = List.last (stageUpdate num)
+
     let recentUpdate (num: int) = 
         let prevUpdate = stageUpdate (num - 1) |> Set.ofList
         let curUpdate = stageUpdate num |> Set.ofList
@@ -42,12 +46,12 @@ module Stage =
         let update = stageUpdate num
         if File.Exists(path) then
             File.ReadAllText(path)
-            |> fun map -> StageParser.makeCompactStage map (stageGroundFlag update)
-            |> fun map -> InStage.newStage map patch (stageInventoryFlag update)
+            |> fun map -> StageParser.makeCompactStage map (not (stageGroundFlag update))
+            |> fun map -> InStage.newStage map patch (stagePushFlag update) (not (stageGroundFlag update)) (stageInventoryFlag update)
             |> Some
         else None
     
-    let Update = InStage.update
+    let update = InStage.update
 
     let stageResultCall (stage: InStage) = 
         match fst stage.movement with
@@ -92,7 +96,7 @@ module Stage =
 
 
     
-
+    let screenCenter = Vector2(GameCore.virtualScreenSize.X*0.5f,GameCore.virtualScreenSize.Y*0.5f)
     let drawDefault (context: DrawContext) (pos: Vector2) (color: Color) = 
         let shape = AssetMap.getDefaultTexture context
         let scale = Vector2(float32 GameCore.BlockSize, float32 GameCore.BlockSize)
@@ -179,7 +183,7 @@ module Stage =
         | ObjectMove (objects, from, goto), Some gameTime when movetime <> 0.0f ->
             let delta = StageGrid.gridPosToVector (goto - from)
             let deltaRatio = (gameTime - stage.moveTimeSpent)/movetime
-            let realPos = StageGrid.gridPosToVector from + Vector2(delta.X*deltaRatio, delta.Y*deltaRatio)
+            let realPos = StageGrid.gridPosToVector from + Vector2(delta.X*deltaRatio, delta.Y*deltaRatio) - stage.cameraPos
             objects
             |> Array.iter (fun object ->
                     match object with
@@ -206,6 +210,6 @@ module Stage =
         ()
     
     let drawGame (context: DrawContext) (stage: InStage) (offset: Vector2) = 
-        drawStage context stage offset
+        drawStage context stage (offset + screenCenter)
         drawInventory context stage offset
 

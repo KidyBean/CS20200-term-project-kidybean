@@ -4,15 +4,15 @@ type GameScreen =
     | MainMenu
     | BlackScreen of float32
     | StageSelect of int
+    | PatchNote
     | StageBlockPopup
     | StageLoader // blackScreen
     | StagePlaying
-    | Tutorial of int
+    | Tutorial
     | PauseMenu
-    | GameOver
     | BrokenScreen
     | VictoryScreen
-    | EndScreen
+    | StageResult
     | SaveLoad // after this screen is optional
     | CustomScreen of string
     | NoScreen

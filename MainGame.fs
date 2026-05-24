@@ -44,13 +44,29 @@ type MainGame() as self =
     override self.LoadContent() =
         let loadSpriteBatch = new SpriteBatch(self.GraphicsDevice)
         let loadAssets = {
-            fonts = Map [
-                DefaultFont, self.Content.Load<SpriteFont>("font/DefaultFont")
-            ]
-            textures = Map [
-                BasePixel, new Texture2D(self.GraphicsDevice, 1, 1)
-            ]
+            fonts = 
+                AssetMap.fontToAssetName
+                |> List.map (fun (name, path) -> 
+                    try
+                        name, self.Content.Load<SpriteFont>(path)
+                    with
+                    | _ -> name, self.Content.Load<SpriteFont>("font/DefaultFont")
+                ) |> Map.ofList
+            textures = 
+                AssetMap.textureToAssetName
+                |> List.choose (fun (name, path) -> 
+                    match path with
+                    | Some path ->
+                        try 
+                            Some (name, self.Content.Load<Texture2D>(path))
+                        with
+                        | _ -> None
+                    | None -> None
+                ) 
+                |> Map.ofList
+                |> Map.add BasePixel (new Texture2D(self.GraphicsDevice, 1, 1))
         }
+        loadAssets.fonts.[DefaultFont].LineSpacing <- 50
         loadAssets.textures.[BasePixel].SetData([|Color.White|])
         mainContext <- { spriteBatch = loadSpriteBatch; assets = loadAssets }
     
@@ -70,6 +86,7 @@ type MainGame() as self =
         screenState <- newScreen
         match action with
         | Some UI.Blocked -> []
+        | _ when screenState.state <> StagePlaying -> []
         | Some (UI.StageAction action) -> GameState.updateStage playState (Some action) deltaTime
         | _ -> GameState.updateStage playState None deltaTime
         |> GameState.stateChangeAdd gameStateChange

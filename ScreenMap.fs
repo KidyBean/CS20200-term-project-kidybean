@@ -148,10 +148,7 @@ module InteractUI =
             | (None, _), None -> None, []
         match handlerButtonResult, input.keyboard.curKey with
         | (Some action, stateChange), _ -> Some action, stateChange
-        | (None, _), Some key when input.keyboard.prevKey <> Some key -> 
-            match interact.keys key with
-            | None, [] -> Some (UI.StageAction key), []
-            | v -> v
+        | (None, _), Some key when input.keyboard.prevKey <> Some key -> interact.keys key
         | _, _ -> None, []
 
 
@@ -252,12 +249,20 @@ module ScreenMapBase =
         handler = DefaultHandler state
     }
     
+
+
+    ///
+    /// #   #   ###   #####  #   #     #   #  #####  #   #  #   #
+    /// ## ##  #   #    #    ##  #     ## ##  #      ##  #  #   #
+    /// # # #  #####    #    # # #     # # #  ####   # # #  #   #
+    /// #   #  #   #    #    #  ##     #   #  #      #  ##  #   #
+    /// #   #  #   #  #####  #   #     #   #  #####  #   #   ### 
     /// Main Menu Screen ---------------------------------------------------------------------
     let MainMenu: UI.ScreenUI = 
         // title
         let titleText: UI.InnerText = { 
             font = DefaultFont 
-            content = "Play In Progress"
+            content = Dialogue.Title
             color = Color.White
             scale = 3.0f
             pos = UI.AlignPos (UI.CenterX, UI.CenterY)
@@ -273,7 +278,7 @@ module ScreenMapBase =
         // press enter to start
         let promptText: UI.InnerText = { 
             font = DefaultFont 
-            content = "Press Enter to Start"
+            content = Dialogue.startPrompt
             color = Color.White
             scale = 1.0f
             pos = UI.AlignPos (UI.CenterX, UI.CenterY)
@@ -319,25 +324,31 @@ module ScreenMapBase =
 
 
 
+    ///
+    /// #####  #####  #      #####  #####  #####
+    /// #      #      #      #      #        #  
+    /// #####  ####   #      ####   #        #  
+    ///     #  #      #      #      #        #  
+    /// #####  #####  #####  #####  #####    #  
     /// Stage Select Screen ----------------------------------------------------------------
     let StageSelectBase (v: int) : UI.ScreenUI = 
         let patchVerText: UI.InnerText = {
             font = DefaultFont 
-            content = sprintf "Patch Ver 1.%02d" v
+            content = Dialogue.patchVer v
             color = Color.White
             scale = 2.0f
             pos = UI.AlignPos (UI.CenterX, UI.Top)
         }
         let DescText: UI.InnerText = {
             font = DefaultFont 
-            content = "Our First Release"
+            content = Dialogue.getPromptVer v
             color = Color.White
             scale = 1.2f
             pos = UI.AlignPos (UI.CenterX, UI.CenterY)
         }
         let promptText: UI.InnerText = {
             font = DefaultFont 
-            content = "Press Enter"
+            content = Dialogue.startPrompt
             color = Color.White
             scale = 1.5f
             pos = UI.AlignPos (UI.CenterX, UI.Bottom)
@@ -386,8 +397,15 @@ module ScreenMapBase =
             size = Vector2(64.0f, 96.0f)
             pos = UI.AlignPos (UI.CenterX, UI.CenterY)
         }
+
+        let lButtonTexture: UI.InnerTexture = {
+            texture = ArrowL
+            color = Color.White
+            size = Vector2(64.0f, 96.0f)
+            pos = UI.AlignPos (UI.CenterX, UI.CenterY)
+        }
         let leftButtonScreen: UI.SubScreen = {
-            inner = [UI.Texture MoveButtonOuter; UI.Texture MoveButtonInner]
+            inner = [UI.Texture MoveButtonOuter; UI.Texture MoveButtonInner; UI.Texture lButtonTexture]
             pos = Vector2(240.0f, 320.0f)
             size = Vector2(80.0f, 112.0f)
         }
@@ -401,8 +419,14 @@ module ScreenMapBase =
 
 
 
+        let rButtonTexture: UI.InnerTexture = {
+            texture = ArrowR
+            color = Color.White
+            size = Vector2(64.0f, 96.0f)
+            pos = UI.AlignPos (UI.CenterX, UI.CenterY)
+        }
         let rightButtonScreen: UI.SubScreen = {
-            inner = [UI.Texture MoveButtonOuter; UI.Texture MoveButtonInner]
+            inner = [UI.Texture MoveButtonOuter; UI.Texture MoveButtonInner; UI.Texture rButtonTexture]
             pos = Vector2(960.0f, 320.0f)
             size = Vector2(80.0f, 112.0f)
         }
@@ -437,6 +461,7 @@ module ScreenMapBase =
         | 0 -> _goPrev state
         | 1 -> _goNext state
         | 2 -> Some (UI.Moveto (GameScreen.StageLoader, { transitionType = Fade 1.0f; duration = 0.4f })), []
+        | 3 -> Some (UI.Moveto (GameScreen.PatchNote, { transitionType = Popup true; duration = 0.3f })), []
         | _ -> None, []
     let StageSelectKey (state: GameState) = function
         | Escape -> Some (UI.Moveto (GameScreen.MainMenu, { transitionType = Fade 0.5f; duration = 0.8f })), []
@@ -445,9 +470,13 @@ module ScreenMapBase =
         | Confirm -> Some (UI.Moveto (GameScreen.StageLoader, { transitionType = Fade 1.0f; duration = 0.4f })), []
         | _ -> None, []
     let StageSelectHandler (state: GameState) () = 
-        None, []
-    let StageSelectCache = List.map (fun v -> v, StageSelectBase v) [0..GameCore.gameStage] |> Map.ofList
+        if GameState.isStagePatched (GameState.getPresentStage state) state then None, []
+        else
+            let action = UI.Moveto (GameScreen.PatchNote, { transitionType = Sudden 1.0f; duration = 0.0f })
+            Some action, []
+            
 
+    let StageSelectCache = List.map (fun v -> v, StageSelectBase v) [0..GameCore.gameStage] |> Map.ofList
 
     let StageSelectScreen (state: GameState) (v: int): UI.ScreenUI = StageSelectCache |> Map.find v
     let StageSelectInteract (state: GameState): UI.ScreenInteract = {
@@ -456,11 +485,178 @@ module ScreenMapBase =
         handler = StageSelectHandler state
     }
 
+    let comebackToStageSelect (state: GameState) = UI.Moveto (GameScreen.StageSelect (GameState.getPresentStage state), { transitionType = Popup false; duration = 0.3f })
 
 
 
 
 
+
+    ///
+    /// ####   ###   #####  #####  #   #
+    /// #   # #   #    #    #      #   #
+    /// ####  #####    #    #      #####
+    /// #     #   #    #    #      #   #
+    /// #     #   #    #    #####  #   #
+    /// PatchNote ----------------------------------------------------------------
+    let PatchNoteBase: UI.ScreenUI = 
+        let PopupOuter: UI.InnerTexture = {
+            texture = BasePixel
+            color = Color.Navy
+            size = Vector2(1024.0f, 592.0f)
+            pos = UI.AlignPos (UI.CenterX, UI.CenterY)
+        }
+        let PopupInner: UI.InnerTexture = {
+            texture = BasePixel
+            color = Color.Black
+            size = Vector2(1008.0f, 576.0f)
+            pos = UI.AlignPos (UI.CenterX, UI.CenterY)
+        }
+        
+        let PopupScreen: UI.SubScreen = {
+            inner = [UI.Texture PopupOuter; UI.Texture PopupInner]
+            pos = Vector2(128.0f, 64.0f)
+            size = Vector2(1024.0f, 592.0f)
+        }
+
+
+
+        let buttonOuter: UI.InnerTexture = {
+            texture = BasePixel
+            color = Color.Navy
+            size = Vector2(56.0f, 56.0f)
+            pos = UI.AlignPos (UI.CenterX, UI.CenterY)
+        }
+        let buttonInner: UI.InnerTexture = {
+            texture = BasePixel
+            color = Color.Black
+            size = Vector2(40.0f, 40.0f)
+            pos = UI.AlignPos (UI.CenterX, UI.CenterY)
+        }
+        let buttonTexture: UI.InnerTexture = {
+            texture = X
+            color = Color.White
+            size = Vector2(40.0f, 40.0f)
+            pos = UI.AlignPos (UI.CenterX, UI.CenterY)
+        }
+        let button: UI.SubScreen = {
+            inner = [UI.Texture buttonOuter; UI.Texture buttonInner; UI.Texture buttonTexture]
+            pos = Vector2(1072.0f, 88.0f)
+            size = Vector2(56.0f, 56.0f)
+        }
+
+        let PopupButton: UI.ButtonInfo = {
+            Id = 0
+            normalLayout = button
+            hoveredLayout = None
+            pressedLayout = None
+        }
+        let subscreens = [PopupScreen]
+        let buttons = [PopupButton]
+        { buttons = buttons; subscreens = subscreens }
+    let PatchNoteButton (state: GameState) = function
+        | 0 -> 
+            let action = comebackToStageSelect state
+            let change = GameState.addPatchOnStage state
+            Some action, change
+        | _ -> None, []
+    let PatchNoteKey (state: GameState) = function
+        | Escape ->
+            let action = comebackToStageSelect state
+            let change = GameState.addPatchOnStage state
+            Some action, change
+        | _ -> None, []
+    let PatchNoteHandler (state: GameState) () =
+        None, GameState.setLastUpdate state
+    
+    let PatchNoteScreen (state: GameState): UI.ScreenUI = 
+        let popUp = List.head PatchNoteBase.subscreens
+        let stagenum = GameState.getPresentStage state
+        let recent = Stage.recentUpdate stagenum
+        let patch = GameState.getPatch stagenum state
+
+        let upperRatio = (0.2f, 0.27f)
+        let lowerRatio = (0.57f, 0.64f)
+        let horizontal = 0.1f
+
+        let PatchVer: UI.SubScreenInner = UI.Text {
+            font = DefaultFont 
+            content = Dialogue.patchVer stagenum
+            color = Color.White
+            scale = 1.5f
+            pos = UI.CustomRatioPos (Vector2(horizontal*0.3f, 0.06f))
+        }
+
+        let popUpAdd = 
+            match recent with
+            | Some func -> 
+                let newFuncTitle: UI.SubScreenInner = UI.Text {
+                    font = DefaultFont 
+                    content = Dialogue.newUpdate
+                    color = Color.White
+                    scale = 0.75f
+                    pos = UI.CustomRatioPos (Vector2(horizontal*0.5f, fst upperRatio))
+                }
+                let newPatchTitle: UI.SubScreenInner = UI.Text {
+                    font = DefaultFont 
+                    content = Dialogue.bugFix
+                    color = Color.White
+                    scale = 0.75f
+                    pos = UI.CustomRatioPos (Vector2(horizontal*0.5f, fst lowerRatio))
+                }
+
+
+                let newFuncPrompt: UI.SubScreenInner = UI.Text {
+                    font = DefaultFont 
+                    content = Dialogue.updatePrompt func
+                    color = Color.White
+                    scale = 0.666f
+                    pos = UI.CustomRatioPos (Vector2(horizontal*0.7f, snd upperRatio))
+                }
+                let newPatchPrompt: UI.SubScreenInner = UI.Text {
+                    font = DefaultFont 
+                    content = Dialogue.patchPrompt patch
+                    color = Color.White
+                    scale = 0.666f
+                    pos = UI.CustomRatioPos (Vector2(horizontal*0.7f, snd lowerRatio))
+                }
+                [PatchVer; newFuncTitle; newPatchTitle; newFuncPrompt; newPatchPrompt]
+            | None ->
+                let newPatchTitle: UI.SubScreenInner = UI.Text {
+                    font = DefaultFont 
+                    content = Dialogue.bugFix
+                    color = Color.White
+                    scale = 0.75f
+                    pos = UI.CustomRatioPos (Vector2(horizontal*0.5f, fst upperRatio))
+                }
+                let newPatchPrompt: UI.SubScreenInner = UI.Text {
+                    font = DefaultFont 
+                    content = Dialogue.patchPrompt patch
+                    color = Color.White
+                    scale = 0.666f
+                    pos = UI.CustomRatioPos (Vector2(horizontal*0.7f, snd upperRatio))
+                }
+                [PatchVer; newPatchTitle; newPatchPrompt]
+        { PatchNoteBase with subscreens = [{popUp with inner = popUp.inner @ popUpAdd}] }
+    /// Main Menu Interaction
+    let PatchNoteInteract (state: GameState): UI.ScreenInteract = {
+        buttons = PatchNoteButton state
+        keys = PatchNoteKey state
+        handler = PatchNoteHandler state
+    }
+
+
+
+
+
+
+
+    ///
+    /// ####   #       ###   #####  #   #
+    /// #   #  #      #   #  #      #  # 
+    /// ####   #      #   #  #      ###  
+    /// #   #  #      #   #  #      #  # 
+    /// ####   #####   ###   #####  #   #
     /// Stage Block Popup ----------------------------------------------------------------
     let StageBlockPopupBase: UI.ScreenUI = 
         let PopupOuter: UI.InnerTexture = {
@@ -509,8 +705,14 @@ module ScreenMapBase =
             size = Vector2(40.0f, 40.0f)
             pos = UI.AlignPos (UI.CenterX, UI.CenterY)
         }
+        let buttonTexture: UI.InnerTexture = {
+            texture = X
+            color = Color.White
+            size = Vector2(40.0f, 40.0f)
+            pos = UI.AlignPos (UI.CenterX, UI.CenterY)
+        }
         let button: UI.SubScreen = {
-            inner = [UI.Texture buttonOuter; UI.Texture buttonInner]
+            inner = [UI.Texture buttonOuter; UI.Texture buttonInner; UI.Texture buttonTexture]
             pos = Vector2(960.0f, 120.0f)
             size = Vector2(56.0f, 56.0f)
         }
@@ -525,10 +727,10 @@ module ScreenMapBase =
         let buttons = [PopupButton]
         { buttons = buttons; subscreens = subscreens }
     let StageBlockPopupButton (state: GameState) = function
-        | 0 -> Some (UI.Moveto (GameScreen.StageSelect (GameState.getPresentStage state), { transitionType = Popup false; duration = 0.5f })), []
+        | 0 -> Some (comebackToStageSelect state), []
         | _ -> None, []
     let StageBlockPopupKey (state: GameState) = function
-        | Escape -> Some (UI.Moveto (GameScreen.StageSelect (GameState.getPresentStage state), { transitionType = Popup false; duration = 0.5f })), []
+        | Escape -> Some (comebackToStageSelect state), []
         | _ -> None, []
     let StageBlockPopupHandler (state: GameState) () =
         None, []
@@ -546,6 +748,13 @@ module ScreenMapBase =
 
 
 
+
+    ///
+    /// #       ###    ###   ####   #####  #### 
+    /// #      #   #  #   #  #   #  #      #   #
+    /// #      #   #  #####  #   #  ####   #### 
+    /// #      #   #  #   #  #   #  #      #  # 
+    /// #####   ###   #   #  ####   #####  #   #
     /// Stage Loader ----------------------------------------------------------------
     let StageLoaderHandler (state: GameState) () = 
         let stagenum = GameState.getPresentStage state
@@ -567,6 +776,13 @@ module ScreenMapBase =
 
 
 
+
+    ///
+    /// #####  #####   ###    ###   #####      ####   #       ###   #   #
+    /// #        #    #   #  #      #          #   #  #      #   #   # # 
+    /// #####    #    #####  # ###  ####       ####   #      #####    #  
+    ///     #    #    #   #  #   #  #          #      #      #   #    #  
+    /// #####    #    #   #   ###   #####      #      #####  #   #    #  
     /// Stage Playing ----------------------------------------------------------------
     let StagePlayingBase: UI.ScreenUI = 
         let buttonOuter: UI.InnerTexture = {
@@ -581,15 +797,35 @@ module ScreenMapBase =
             size = Vector2(40.0f, 40.0f)
             pos = UI.AlignPos (UI.CenterX, UI.CenterY)
         }
+
+        let overButtonTexture: UI.InnerTexture = {
+            texture = Pause
+            color = Color.White
+            size = Vector2(40.0f, 40.0f)
+            pos = UI.AlignPos (UI.CenterX, UI.CenterY)
+        }
         let OverButton: UI.SubScreen = {
-            inner = [UI.Texture buttonOuter; UI.Texture buttonInner]
-            pos = Vector2(1192.0f, 32.0f)
+            inner = [UI.Texture buttonOuter; UI.Texture buttonInner; UI.Texture overButtonTexture]
+            pos = Vector2(1200.0f, 24.0f)
             size = Vector2(56.0f, 56.0f)
         }
+        
+        let underButtonTexture: UI.InnerTexture = {
+            texture = Tuto
+            color = Color.White
+            size = Vector2(40.0f, 40.0f)
+            pos = UI.AlignPos (UI.CenterX, UI.CenterY)
+        }
         let UnderButton: UI.SubScreen = {
-            inner = [UI.Texture buttonOuter; UI.Texture buttonInner]
-            pos = Vector2(1192.0f, 120.0f)
+            inner = [UI.Texture buttonOuter; UI.Texture buttonInner; UI.Texture underButtonTexture]
+            pos = Vector2(1200.0f, 104.0f)
             size = Vector2(56.0f, 56.0f)
+        }
+        let lButtonTexture: UI.InnerTexture = {
+            texture = ArrowL
+            color = Color.White
+            size = Vector2(64.0f, 96.0f)
+            pos = UI.AlignPos (UI.CenterX, UI.CenterY)
         }
         let tutorialButton: UI.ButtonInfo = {
             Id = 0
@@ -608,18 +844,148 @@ module ScreenMapBase =
         let buttons = [tutorialButton; pauseButton]
         { buttons = buttons; subscreens = subscreens }
     let StagePlayingButton (state: GameState) = function
+        | 0 ->
+            let action = UI.Moveto (GameScreen.Tutorial, { transitionType = Popup true; duration = 0.3f })
+            Some action, []
+        | 1 -> 
+            let action = UI.Moveto (GameScreen.PauseMenu, { transitionType = Popup true; duration = 0.3f })
+            Some action, []
         | _ -> None, []
     let StagePlayingKey (state: GameState) = function
-        | _ -> None, []
+        | Escape -> 
+            let action = UI.Moveto (GameScreen.PauseMenu, { transitionType = Popup true; duration = 0.3f })
+            Some action, []
+        | v -> Some (UI.StageAction v), []
     let StagePlayingHandler (state: GameState) () =
-        None, []
+        if GameState.needTutorial (GameState.getPresentStage state) state then
+            let action = UI.Moveto (GameScreen.Tutorial, { transitionType = Sudden 1.0f; duration = 0.0f })
+            Some action, []
+        else 
+            match GameState.stageEndState state with
+            | StageVictory -> 
+                let action = UI.Moveto (GameScreen.VictoryScreen, { transitionType = Sudden 1.0f; duration = 0.5f })
+                Some action, []
+            | StageCrashed _ -> 
+                let action = UI.Moveto (GameScreen.BrokenScreen, { transitionType = Sudden 1.0f; duration = 0.5f })
+                Some action, []
+            | _ -> None, []
     
     let StagePlayingScreen (state: GameState): UI.ScreenUI = StagePlayingBase
     /// Main Menu Interaction
     let StagePlayingInteract (state: GameState): UI.ScreenInteract = {
-        buttons = StageBlockPopupButton state
-        keys = StageBlockPopupKey state
-        handler = StageBlockPopupHandler state
+        buttons = StagePlayingButton state
+        keys = StagePlayingKey state
+        handler = StagePlayingHandler state
+    }
+    let comebackToStagePlay = UI.Moveto (GameScreen.StagePlaying, { transitionType = Popup false; duration = 0.3f })
+
+
+
+
+
+
+    ///
+    /// #####  #   #  #####   ###   ####   #####   ###   #    
+    ///   #    #   #    #    #   #  #   #    #    #   #  #    
+    ///   #    #   #    #    #   #  ####     #    #####  #    
+    ///   #    #   #    #    #   #  #  #     #    #   #  #    
+    ///   #     ###     #     ###   #   #  #####  #   #  #####
+    /// Tutorial Popup ----------------------------------------------------------------
+    let TutorialBase: UI.ScreenUI = 
+        let PopupOuter: UI.InnerTexture = {
+            texture = BasePixel
+            color = Color.Navy
+            size = Vector2(1024.0f, 592.0f)
+            pos = UI.AlignPos (UI.CenterX, UI.CenterY)
+        }
+        let PopupInner: UI.InnerTexture = {
+            texture = BasePixel
+            color = Color.Black
+            size = Vector2(1008.0f, 576.0f)
+            pos = UI.AlignPos (UI.CenterX, UI.CenterY)
+        }
+        let PopupScreen: UI.SubScreen = {
+            inner = [UI.Texture PopupOuter; UI.Texture PopupInner]
+            pos = Vector2(128.0f, 64.0f)
+            size = Vector2(1024.0f, 592.0f)
+        }
+
+
+
+        let buttonOuter: UI.InnerTexture = {
+            texture = BasePixel
+            color = Color.Navy
+            size = Vector2(56.0f, 56.0f)
+            pos = UI.AlignPos (UI.CenterX, UI.CenterY)
+        }
+        let buttonInner: UI.InnerTexture = {
+            texture = BasePixel
+            color = Color.Black
+            size = Vector2(40.0f, 40.0f)
+            pos = UI.AlignPos (UI.CenterX, UI.CenterY)
+        }
+        let buttonTexture: UI.InnerTexture = {
+            texture = X
+            color = Color.White
+            size = Vector2(40.0f, 40.0f)
+            pos = UI.AlignPos (UI.CenterX, UI.CenterY)
+        }
+        let button: UI.SubScreen = {
+            inner = [UI.Texture buttonOuter; UI.Texture buttonInner; UI.Texture buttonTexture]
+            pos = Vector2(1072.0f, 88.0f)
+            size = Vector2(56.0f, 56.0f)
+        }
+
+        let PopupButton: UI.ButtonInfo = {
+            Id = 0
+            normalLayout = button
+            hoveredLayout = None
+            pressedLayout = None
+        }
+        let subscreens = [PopupScreen]
+        let buttons = [PopupButton]
+        { buttons = buttons; subscreens = subscreens }
+    let TutorialButton (state: GameState) = function
+        | 0 ->
+            let action = comebackToStagePlay
+            let change = GameState.tutorialPlayed (GameState.getPresentStage state)
+            Some action, change
+        | _ -> None, []
+    let TutorialKey (state: GameState) = function
+        | Escape ->
+            let action = comebackToStagePlay
+            let change = GameState.tutorialPlayed (GameState.getPresentStage state)
+            Some action, change
+        | _ -> None, []
+    let TutorialHandler (state: GameState) () =
+        None, []
+    let TutorialScreen (state: GameState) = 
+        let popUp = List.head PatchNoteBase.subscreens
+        let stagenum = GameState.getPresentStage state
+        let horizontal = 0.1f
+        let upperRatio = (0.06f, 0.2f)
+
+        let title = UI.Text {
+            font = DefaultFont 
+            content = Dialogue.tutorial
+            color = Color.White
+            scale = 1.5f
+            pos = UI.CustomRatioPos (Vector2(horizontal*0.3f, fst upperRatio))
+        }
+        let prompt = UI.Text {
+            font = DefaultFont 
+            content = Dialogue.tutorialPrompt (Stage.lastUpdate (GameState.getPresentStage state))
+            color = Color.White
+            scale = 0.666f
+            pos = UI.CustomRatioPos (Vector2(horizontal*0.7f, snd upperRatio))
+        }
+        let popUpAdd = [title; prompt]
+        { TutorialBase with subscreens = [{popUp with inner = popUp.inner @ popUpAdd}] }
+
+    let TutorialInteraction (state: GameState): UI.ScreenInteract = {
+        buttons = TutorialButton state
+        keys = TutorialKey state
+        handler = TutorialHandler state
     }
 
 
@@ -627,19 +993,374 @@ module ScreenMapBase =
 
 
 
-    /// PatchNote ----------------------------------------------------------------
+    ///
+    /// ####    ###   #   #  #####  #####
+    /// #   #  #   #  #   #  #      #    
+    /// ####   #####  #   #  #####  #### 
+    /// #      #   #  #   #      #  #    
+    /// #      #   #   ###   #####  #####
+    /// Pause Popup ----------------------------------------------------------------
+    let PauseBase: UI.ScreenUI = 
+        let PopupOuter = UI.Texture {
+            texture = BasePixel
+            color = Color.Navy
+            size = Vector2(512.0f, 592.0f)
+            pos = UI.AlignPos (UI.CenterX, UI.CenterY)
+        }
+        let PopupInner = UI.Texture {
+            texture = BasePixel
+            color = Color.Black
+            size = Vector2(496.0f, 576.0f)
+            pos = UI.AlignPos (UI.CenterX, UI.CenterY)
+        }
+        let prompt = UI.Text {
+            font = DefaultFont 
+            content = Dialogue.pause
+            color = Color.White
+            scale = 2f
+            pos = UI.AlignPos (UI.CenterX, UI.Top)
+        }
+        let PopupScreen: UI.SubScreen = {
+            inner = [PopupOuter; PopupInner; prompt]
+            pos = Vector2(384.0f, 64.0f)
+            size = Vector2(512.0f, 592.0f)
+        }
+
+
+
+        let buttonOuter = UI.Texture {
+            texture = BasePixel
+            color = Color.Navy
+            size = Vector2(432.0f, 80.0f)
+            pos = UI.AlignPos (UI.CenterX, UI.CenterY)
+        }
+        let buttonInner = UI.Texture {
+            texture = BasePixel
+            color = Color.Black
+            size = Vector2(416.0f, 64.0f)
+            pos = UI.AlignPos (UI.CenterX, UI.CenterY)
+        }
+
+
+
+        let promptResume = UI.Text {
+            font = DefaultFont 
+            content = Dialogue.resume
+            color = Color.White
+            scale = 1.5f
+            pos = UI.AlignPos (UI.CenterX, UI.Top)
+        }
+        let screenResume: UI.SubScreen = {
+            inner = [buttonOuter; buttonInner; promptResume]
+            pos = Vector2(424.0f, 304.0f)
+            size = Vector2(432.0f, 72.0f)
+        }
+        let buttonResume: UI.ButtonInfo = {
+            Id = 0
+            normalLayout = screenResume
+            hoveredLayout = None
+            pressedLayout = None
+        }
+        let promptRestart = UI.Text {
+            font = DefaultFont 
+            content = Dialogue.restart
+            color = Color.White
+            scale = 1.5f
+            pos = UI.AlignPos (UI.CenterX, UI.Top)
+        }
+        let screenRestart: UI.SubScreen = {
+            inner = [buttonOuter; buttonInner; promptRestart]
+            pos = Vector2(424.0f, 408.0f)
+            size = Vector2(432.0f, 72.0f)
+        }
+        let buttonRestart: UI.ButtonInfo = {
+            Id = 1
+            normalLayout = screenRestart
+            hoveredLayout = None
+            pressedLayout = None
+        }
+        let promptExit = UI.Text {
+            font = DefaultFont 
+            content = Dialogue.exit
+            color = Color.White
+            scale = 1.5f
+            pos = UI.AlignPos (UI.CenterX, UI.Top)
+        }
+        let screenExit: UI.SubScreen = {
+            inner = [buttonOuter; buttonInner; promptExit]
+            pos = Vector2(424.0f, 512.0f)
+            size = Vector2(432.0f, 72.0f)
+        }
+        let buttonExit: UI.ButtonInfo = {
+            Id = 2
+            normalLayout = screenExit
+            hoveredLayout = None
+            pressedLayout = None
+        }
+
+        let subscreens = [PopupScreen]
+        let buttons = [buttonResume; buttonRestart; buttonExit]
+        { buttons = buttons; subscreens = subscreens }
+    let PauseButton (state: GameState) = function
+        | 0 -> Some comebackToStagePlay, []
+        | 1 -> Some (UI.Moveto (GameScreen.StageLoader, { transitionType = Fade 1.0f; duration = 0.4f })), GameState.ExitStage ()
+        | 2 -> Some (UI.Moveto (GameScreen.StageSelect (GameState.getPresentStage state), { transitionType = Fade 0.5f; duration = 0.6f })), GameState.ExitStage ()
+        | _ -> None, []
+    let PauseKey (state: GameState) = function
+        | Escape -> Some comebackToStagePlay, []
+        | _ -> None, []
+    let PauseHandler (state: GameState) () =
+        None, []
+    
+    let PauseScreen (state: GameState): UI.ScreenUI = PauseBase
+    let PauseInteract (state: GameState): UI.ScreenInteract = {
+        buttons = PauseButton state
+        keys = PauseKey state
+        handler = PauseHandler state
+    }
 
 
 
 
 
 
+    ///
+    /// #   #  #####  #####  #####   ###   ####   #   #
+    /// #   #    #    #        #    #   #  #   #   # # 
+    /// #   #    #    #        #    #   #  ####     #  
+    ///  # #     #    #        #    #   #  #  #     #  
+    ///   #    #####  #####    #     ###   #   #    #  
+    /// Victory Screen ----------------------------------------------------------------
+    let victoryBase: UI.ScreenUI = 
+        // title
+        let titleText: UI.InnerText = { 
+            font = DefaultFont 
+            content = Dialogue.victory
+            color = Color.White
+            scale = 3.0f
+            pos = UI.AlignPos (UI.CenterX, UI.CenterY)
+        }
+
+        let titleScreen: UI.SubScreen = {
+            inner = [UI.Text titleText]
+            pos = Vector2(100.0f, 100.0f)
+            size = Vector2(1080.0f, 200.0f)
+        }
+
+
+        // press enter to start
+        let promptText: UI.InnerText = { 
+            font = DefaultFont 
+            content = Dialogue.gonextResult
+            color = Color.White
+            scale = 1.0f
+            pos = UI.AlignPos (UI.CenterX, UI.CenterY)
+        }
+        let promptScreen: UI.SubScreen = {
+            inner = [UI.Text promptText]
+            pos = Vector2(100.0f, 500.0f)
+            size = Vector2(1080.0f, 100.0f)
+        }
+
+        let button: UI.ButtonInfo = {
+            Id = 0
+            normalLayout = subScreenOfMainSize []
+            hoveredLayout = Some (subScreenOfMainSize [])
+            pressedLayout = Some (subScreenOfMainSize [])
+        }
+
+        // organize
+        let subscreens = [titleScreen; promptScreen]
+        let buttons = [button]
+        { buttons = buttons; subscreens = subscreens }
+    
+
+    let gotoStageResultButton (state: GameState) = function
+        | 0 -> Some (UI.Moveto (GameScreen.StageResult, { transitionType = Fade 0.4f; duration = 0.8f })), []
+        | _ -> None, []
+    let gotoStageResultKey (state: GameState) = function
+        | Confirm -> Some (UI.Moveto (GameScreen.StageResult, { transitionType = Fade 0.4f; duration = 0.8f })), []
+        | _ -> None, []
+    
+    let VictoryScreen (state: GameState): UI.ScreenUI = victoryBase
+    /// Main Menu Interaction
+    let VictoryInteract (state: GameState): UI.ScreenInteract = {
+            buttons = gotoStageResultButton state
+            keys = gotoStageResultKey state
+            handler = DefaultHandler state
+    }
 
 
 
 
 
 
+    ///
+    /// #####  ####    ###   #####  #   #  #####  #### 
+    /// #      #   #  #   #  #      #   #  #      #   #
+    /// #      ####   #####  #####  #####  ####   #   #
+    /// #      #  #   #   #      #  #   #  #      #   #
+    /// #####  #   #  #   #  #####  #   #  #####  #### 
+    /// Crashed Screen ----------------------------------------------------------------
+    let CrashedBase: UI.ScreenUI = 
+        // title
+        let titleText: UI.InnerText = { 
+            font = DefaultFont 
+            content = Dialogue.crashed
+            color = Color.White
+            scale = 3.0f
+            pos = UI.AlignPos (UI.CenterX, UI.CenterY)
+        }
+
+        let titleScreen: UI.SubScreen = {
+            inner = [UI.Text titleText]
+            pos = Vector2(100.0f, 100.0f)
+            size = Vector2(1080.0f, 200.0f)
+        }
+
+
+        // press enter to start
+        let promptText: UI.InnerText = { 
+            font = DefaultFont 
+            content = Dialogue.gonextResult
+            color = Color.White
+            scale = 1.0f
+            pos = UI.AlignPos (UI.CenterX, UI.CenterY)
+        }
+        let promptScreen: UI.SubScreen = {
+            inner = [UI.Text promptText]
+            pos = Vector2(100.0f, 500.0f)
+            size = Vector2(1080.0f, 100.0f)
+        }
+
+        let button: UI.ButtonInfo = {
+            Id = 0
+            normalLayout = subScreenOfMainSize []
+            hoveredLayout = Some (subScreenOfMainSize [])
+            pressedLayout = Some (subScreenOfMainSize [])
+        }
+
+        // organize
+        let subscreens = [titleScreen; promptScreen]
+        let buttons = [button]
+        { buttons = buttons; subscreens = subscreens }
+    
+    let CrashedScreen (state: GameState): UI.ScreenUI = CrashedBase
+    /// Main Menu Interaction
+    let CrashedInteract (state: GameState): UI.ScreenInteract = {
+            buttons = gotoStageResultButton state
+            keys = gotoStageResultKey state
+            handler = DefaultHandler state
+    }
+
+
+
+
+
+
+    ///
+    /// ####   #####  #####  #   #  #      #####
+    /// #   #  #      #      #   #  #        #  
+    /// ####   ####   #####  #   #  #        #  
+    /// #  #   #          #  #   #  #        #  
+    /// #   #  #####  #####   ###   #####    #  
+    /// Result Screen ----------------------------------------------------------------
+    let ResultBase: UI.ScreenUI = 
+        let title: UI.SubScreenInner = UI.Text {
+            content = Dialogue.result
+            color = Color.White
+            font = DefaultFont
+            scale = 1.5f
+            pos = UI.CustomRatioPos (Vector2(0.1f, 0.05f))
+        }
+        let mainScreen = subScreenOfMainSize [title]
+        let button: UI.ButtonInfo = {
+            Id = 0
+            normalLayout = subScreenOfMainSize []
+            hoveredLayout = None
+            pressedLayout = None
+        }
+        let subscreens = [mainScreen]
+        let buttons = [button]
+        { buttons = buttons; subscreens = subscreens }
+    let ResultButton (state: GameState) = function
+        | 0 -> 
+            let action = UI.Moveto (GameScreen.StageSelect (GameState.getPresentStage state + 1), { transitionType = Fade 1.0f; duration = 0.3f })
+            let change = GameState.ExitStage () @ GameState.setSelectedStage state (GameState.getPresentStage state + 1)
+            Some action, change
+        | _ -> None, []
+    let ResultKey (state: GameState) = function
+        | Confirm -> 
+            let action = UI.Moveto (GameScreen.StageSelect (GameState.getPresentStage state + 1), { transitionType = Fade 1.0f; duration = 0.3f })
+            let change = GameState.ExitStage () @ GameState.setSelectedStage state (GameState.getPresentStage state + 1)
+            Some action, change
+        | _ -> None, []
+    let ResultHandler (state: GameState) () =
+        match GameState.StageResult state with
+        | Some result ->
+            let vict = GameState.howMapVictory (GameState.getPresentStage state) state
+            let update = GameState.addStageFlag (GameState.getPresentStage state) result.victoryType state
+            match vict, update with
+            | _, [] -> None, []
+            | [Defeat], change -> 
+                let patchAction = GameState.getNextPatch result.usedBug result.crashedWith
+                Some UI.Blocked, change @ patchAction
+            | _, change -> Some UI.Blocked, change
+        | None -> None, []
+
+    let ResultScreen (state: GameState) = 
+        if Option.isNone state.inStage then
+            ResultBase
+        else
+            let screen = List.head ResultBase.subscreens
+            let screenAdd =
+                match GameState.StageResult state with
+                | Some result ->
+                    let vict = UI.Text {
+                        content = Dialogue.victoryType result.victoryType
+                        color = Color.White
+                        font = DefaultFont
+                        scale = 3.0f
+                        pos = UI.CustomRatioPos (Vector2(0.05f, 0.15f))
+                    }
+                    let time = UI.Text {
+                        content = Dialogue.timeSpend result.timeSpend
+                        color = Color.White
+                        font = DefaultFont
+                        scale = 1.0f
+                        pos = UI.CustomRatioPos (Vector2(0.07f, 0.32f))
+                    }
+                    let bugUsed = UI.Text {
+                        content = Dialogue.exploitPrompt result.usedBug
+                        color = Color.White
+                        font = DefaultFont
+                        scale = 1.0f
+                        pos = UI.CustomRatioPos (Vector2(0.07f, 0.41f))
+                    }
+                    let crash = UI.Text {
+                        content = Dialogue.crashPrompt result.crashedWith
+                        color = Color.White
+                        font = DefaultFont
+                        scale = 1.0f
+                        pos = UI.CustomRatioPos (Vector2(0.07f, 0.54f))
+                    }
+                    let gonext = UI.Text {
+                        content = Dialogue.goNextPrompt result.usedBug
+                        color = Color.White
+                        font = DefaultFont
+                        scale = 2.0f
+                        pos = UI.AlignPos (UI.CenterX, UI.Bottom)
+                    }
+                    [vict; time; bugUsed; crash; gonext]
+                
+                | None -> []
+            { ResultBase with subscreens = [{screen with inner = screen.inner @ screenAdd}] }
+
+    let ResultInteract (state: GameState): UI.ScreenInteract = {
+            buttons = ResultButton state
+            keys = ResultKey state
+            handler = ResultHandler state
+    }
 
 
 
@@ -654,16 +1375,30 @@ module ScreenMap =
         match screen with
         | MainMenu -> ScreenMapBase.MainMenuScreen state
         | StageSelect v -> ScreenMapBase.StageSelectScreen state v
+        | PatchNote -> ScreenMapBase.PatchNoteScreen state
         | StageBlockPopup -> ScreenMapBase.StageBlockPopupScreen state
         | StageLoader -> ScreenMapBase.StageLoaderScreen state
+        | StagePlaying -> ScreenMapBase.StagePlayingScreen state
+        | Tutorial -> ScreenMapBase.TutorialScreen state
+        | PauseMenu -> ScreenMapBase.PauseScreen state
+        | VictoryScreen -> ScreenMapBase.VictoryScreen state
+        | BrokenScreen -> ScreenMapBase.CrashedScreen state
+        | StageResult -> ScreenMapBase.ResultScreen state
         | _ -> ScreenMapBase.DefaultScreen state
     
     let interactMap (screen: GameScreen) (state: GameState) = 
         match screen with
         | MainMenu -> ScreenMapBase.MainMenuInteract  state
         | StageSelect _ -> ScreenMapBase.StageSelectInteract state
+        | PatchNote -> ScreenMapBase.PatchNoteInteract state
         | StageBlockPopup -> ScreenMapBase.StageBlockPopupInteract state
         | StageLoader -> ScreenMapBase.StageLoaderInteract state
+        | StagePlaying -> ScreenMapBase.StagePlayingInteract state
+        | Tutorial -> ScreenMapBase.TutorialInteraction state
+        | PauseMenu -> ScreenMapBase.PauseInteract state
+        | VictoryScreen -> ScreenMapBase.VictoryInteract state
+        | BrokenScreen -> ScreenMapBase.CrashedInteract state
+        | StageResult -> ScreenMapBase.ResultInteract state
         | _ -> ScreenMapBase.DefaultInteract state
 
     /// Get next action from input and gamescreen

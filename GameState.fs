@@ -8,6 +8,8 @@ module GS =
     type StageVictoryFlag = bool*bool*bool
     type StageVictoryMap = Map<int, StageVictoryFlag>
 
+    let initialFlag: StageVictoryFlag = false, false, false
+
     let rec flagListtoList (acc: StageState list) = function
         | [] -> List.rev acc
         | (stageState, flag) :: tl -> 
@@ -35,9 +37,9 @@ module GS =
                 match stateList with
                 | [] -> [Defeat]
                 | v -> v
-    
+
     let addStageFlag (stagenum: int) (stageState: StageState) (victoryMap: StageVictoryMap) = 
-        let stageFlag = victoryMap |> Map.tryFind stagenum |> Option.defaultValue (false, false, false)
+        let stageFlag = victoryMap |> Map.tryFind stagenum |> Option.defaultValue initialFlag
         let newFlag, changed = 
             match stageState, stageFlag with
             | Normal, (n, c, e) when not n -> ((true, c, e), true)
@@ -87,6 +89,8 @@ module GameState =
     /// for pipeline a |> GameState.stateChangeAdd b : a -> b
     let stateChangeAdd (change1: GameStateChange list) (change2: GameStateChange list) = change1 @ change2
 
+    let isStagePatched (stagenum: int) (state: GameState) = Option.isSome (Map.tryFind stagenum state.stagePatchList)
+
     // selectedStage
     let getPresentStage (state: GameState) = state.selectedStage
     let setSelectedStage (state: GameState) (stagenum: int) = 
@@ -107,22 +111,46 @@ module GameState =
         match state.needPatch with
         | Some patch -> [PatchListAdd patch; NeedPatchSet None]
         | None -> []
-    let needUpdate (state: GameState) = Option.isSome state.needPatch
+    let needUpdate (state: GameState) = state.needPatch
+
+    let getPatch (stagenum: int) (state: GameState) = 
+        if Option.isSome (needUpdate state) then needUpdate state
+        else
+            let prevPatch = Map.tryFind (stagenum - 1) state.stagePatchList |> Option.defaultValue state.lastPatchList
+            Map.tryFind stagenum state.stagePatchList |> Option.defaultValue state.lastPatchList
+            |> Set.difference prevPatch 
+            |> Seq.tryHead
+    
+    let addPatchOnStage (state: GameState) = 
+        let stagenum = state.selectedStage
+        let result = Map.tryFind stagenum state.stagePatchList
+        if Option.isSome result then []
+        else [StagePatchListSet (stagenum, state.lastPatchList)]
     
     // tutorialPlayed
-    let needTutorial (state: GameState) (stagenum: int) = 
+    let needTutorial (stagenum: int) (state: GameState) = 
         match Map.tryFind stagenum state.tutorialPlayed with
         | Some false | None -> true
         | Some true -> false
-    let tutorialPlayed (stagenum: int) = TutorialPlayedSet (stagenum, true)
+    let tutorialPlayed (stagenum: int) = [TutorialPlayedSet (stagenum, true)]
     // stageResult
     let howMapVictory (stagenum: int) (state: GameState) = GS.howMapVictory stagenum state.stageResult
+
     let addStageFlag (stagenum: int) (stageState: StageState) (state: GameState) = 
         match GS.addStageFlag stagenum stageState state.stageResult with
         | Some changed -> [StageResultChange changed]
         | None -> []
     
     // instage, stagePatch
+    let stageEndState (state: GameState) = 
+        match state.inStage with
+        | Some stage -> Stage.stageResultCall stage
+        | None -> NoAction
+    let StageResult (state: GameState) = 
+        match state.inStage with
+        | Some stage -> Stage.getStageResult stage
+        | None -> None
+
     let loadStage (state: GameState) (stagenum: int) = 
         let result = Map.tryFind stagenum state.stagePatchList
         match result with
@@ -139,7 +167,7 @@ module GameState =
     let updateStage (state: GameState) (key: KeyBind option) (deltaTime: float32) = 
         match state.inStage with
         | Some stage -> 
-            let stageChange = Stage.Update key stage deltaTime
+            let stageChange = Stage.update key stage deltaTime
             [InStageChange (Some stageChange)]
         | None -> []
     let ExitStage () = [InStageChange None]
