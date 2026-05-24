@@ -259,6 +259,17 @@ module StagePlayer =
             | StageObject.CanMakePlayerDead -> Passed (exploit, Dead)
             | StageObject.CanMakePlayerGoal -> Passed (exploit, Victory)
             | _ -> Passed (exploit, Alive)
+    
+    let deletePlayer (stage: InStage) = 
+        let playerPos = stage.playerPos
+        let objectOnPos = StageGrid.objectOnPos playerPos stage.stageMap
+        let playerIdx = objectOnPos |> Array.tryFindIndex (fun x -> x = Player)
+        match playerIdx with
+        | Some idx ->
+            objectOnPos[idx] <- Empty
+            StageGrid.pushObjects objectOnPos playerPos stage.stageMap false
+        | None -> ()
+
         
     let playerMove (direction: Direction) (stage: InStage) = 
         let playerPos = stage.playerPos
@@ -557,6 +568,7 @@ module InStage =
                 }
             | Passed (err, Dead) -> 
                 let transtime, movetime = moveTimeMap PlayerDead
+                StagePlayer.deletePlayer stage
                 { stage with 
                     usedBug = Set.union err stage.usedBug; 
                     movement = ([PlayerDead], transtime); 

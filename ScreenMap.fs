@@ -261,7 +261,7 @@ module ScreenMapBase =
     let MainMenu: UI.ScreenUI = 
         // title
         let titleText: UI.InnerText = { 
-            font = DefaultFont 
+            font = TitleFont 
             content = Dialogue.Title
             color = Color.White
             scale = 3.0f
@@ -303,10 +303,10 @@ module ScreenMapBase =
     
 
     let MainMenuButton (state: GameState) = function
-        | 0 -> Some (UI.Moveto (GameScreen.StageSelect 0, { transitionType = Fade 0.4f; duration = 0.8f })), []
+        | 0 -> Some (UI.Moveto (GameScreen.StageSelect (GameState.getPresentStage state), { transitionType = Fade 0.4f; duration = 0.8f })), []
         | _ -> None, []
     let MainMenuKey (state: GameState) = function
-        | Confirm -> Some (UI.Moveto (GameScreen.StageSelect 0, { transitionType = Fade 0.4f; duration = 0.8f })), []
+        | Confirm -> Some (UI.Moveto (GameScreen.StageSelect (GameState.getPresentStage state), { transitionType = Fade 0.4f; duration = 0.8f })), []
         | _ -> None, []
     let MainMenuHandler (state: GameState) () =
         None, []
@@ -333,7 +333,7 @@ module ScreenMapBase =
     /// Stage Select Screen ----------------------------------------------------------------
     let StageSelectBase (v: int) : UI.ScreenUI = 
         let patchVerText: UI.InnerText = {
-            font = DefaultFont 
+            font = TitleFont 
             content = Dialogue.patchVer v
             color = Color.White
             scale = 2.0f
@@ -343,14 +343,14 @@ module ScreenMapBase =
             font = DefaultFont 
             content = Dialogue.getPromptVer v
             color = Color.White
-            scale = 1.2f
+            scale = 1.1f
             pos = UI.AlignPos (UI.CenterX, UI.CenterY)
         }
         let promptText: UI.InnerText = {
             font = DefaultFont 
             content = Dialogue.startPrompt
             color = Color.White
-            scale = 1.5f
+            scale = 1.4f
             pos = UI.AlignPos (UI.CenterX, UI.Bottom)
         }
         let levelScreenOuter: UI.InnerTexture = {
@@ -580,7 +580,7 @@ module ScreenMapBase =
         let horizontal = 0.1f
 
         let PatchVer: UI.SubScreenInner = UI.Text {
-            font = DefaultFont 
+            font = TitleFont 
             content = Dialogue.patchVer stagenum
             color = Color.White
             scale = 1.5f
@@ -672,15 +672,15 @@ module ScreenMapBase =
             pos = UI.AlignPos (UI.CenterX, UI.CenterY)
         }
         let warning: UI.InnerText = { 
-            font = DefaultFont 
-            content = "Warning"
+            font = TitleFont
+            content = Dialogue.warning
             color = Color.White
             scale = 1.5f
             pos = UI.AlignPos (UI.Left, UI.Top)
         }
         let promptText: UI.InnerText = { 
             font = DefaultFont 
-            content = "\nThe version you are trying to access\n\n is not available yet."
+            content = Dialogue.blockPrompt
             color = Color.White
             scale = 1.0f
             pos = UI.AlignPos (UI.CenterX, UI.CenterY)
@@ -966,7 +966,7 @@ module ScreenMapBase =
         let upperRatio = (0.06f, 0.2f)
 
         let title = UI.Text {
-            font = DefaultFont 
+            font = TitleFont 
             content = Dialogue.tutorial
             color = Color.White
             scale = 1.5f
@@ -1014,7 +1014,7 @@ module ScreenMapBase =
             pos = UI.AlignPos (UI.CenterX, UI.CenterY)
         }
         let prompt = UI.Text {
-            font = DefaultFont 
+            font = TitleFont 
             content = Dialogue.pause
             color = Color.White
             scale = 2f
@@ -1134,7 +1134,7 @@ module ScreenMapBase =
     let victoryBase: UI.ScreenUI = 
         // title
         let titleText: UI.InnerText = { 
-            font = DefaultFont 
+            font = TitleFont 
             content = Dialogue.victory
             color = Color.White
             scale = 3.0f
@@ -1205,7 +1205,7 @@ module ScreenMapBase =
     let CrashedBase: UI.ScreenUI = 
         // title
         let titleText: UI.InnerText = { 
-            font = DefaultFont 
+            font = TitleFont 
             content = Dialogue.crashed
             color = Color.White
             scale = 3.0f
@@ -1319,8 +1319,8 @@ module ScreenMapBase =
                     let vict = UI.Text {
                         content = Dialogue.victoryType result.victoryType
                         color = Color.White
-                        font = DefaultFont
-                        scale = 3.0f
+                        font = TitleFont 
+                        scale = 2.5f
                         pos = UI.CustomRatioPos (Vector2(0.05f, 0.15f))
                     }
                     let time = UI.Text {
@@ -1348,7 +1348,7 @@ module ScreenMapBase =
                         content = Dialogue.goNextPrompt result.usedBug
                         color = Color.White
                         font = DefaultFont
-                        scale = 2.0f
+                        scale = 1.5f
                         pos = UI.AlignPos (UI.CenterX, UI.Bottom)
                     }
                     [vict; time; bugUsed; crash; gonext]

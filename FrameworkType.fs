@@ -8,6 +8,7 @@ open Microsoft.Xna.Framework.Input
 type FontID = 
     | DefaultFont
     | TitleFont
+    | MiddleFont
 
 type Fonts = Map<FontID, SpriteFont>
 
@@ -188,6 +189,7 @@ module AssetMap =
     let fontToAssetName = [
         DefaultFont, "font/DefaultFont"
         TitleFont, "font/TitleFont"
+        MiddleFont, "font/MiddleFont"
     ]
         
     
@@ -273,7 +275,7 @@ module Dialogue =
 
 
 
-    let patchVer v = sprintf "Patch Ver 0.%02d" v
+    let patchVer v = sprintf "Patch v0.%02d" v
     let promptVerMap = Map [
         0, "Our First Release"
         1, "Block pushing\nhas been added\ninto game."
@@ -339,6 +341,8 @@ Additional boundary checks have been added.".TrimStart('\r', '\n')
             | None -> minorStability
         | None -> minorStability
 
+    let warning = "Warning"
+    let blockPrompt = "\nThe version you are trying to access\n\n is not available yet."
 
 
 
@@ -367,13 +371,13 @@ Avoid spikes. Touching them will kill you.".TrimStart('\r', '\n')
     let exit = "EXIT STAGE"
 
 
-    let victory = "!VICTORY!"
-    let crashed = "!GAME CRAHSED!"
+    let victory = "! VICTORY !"
+    let crashed = "! GAME CRAHSED !"
     let gonextResult = "Press Enter to See Result"
 
     let result = "RESULT"
     let gonext = "Press Enter to Go Next"
-    let gonextPatch = "Press Enter to Report Patch"
+    let gonextPatch = "Press Enter to Report Issue"
 
     let victoryType = function
         | Normal -> "Victory! (Normal)"

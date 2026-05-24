@@ -66,7 +66,6 @@ type MainGame() as self =
                 |> Map.ofList
                 |> Map.add BasePixel (new Texture2D(self.GraphicsDevice, 1, 1))
         }
-        loadAssets.fonts.[DefaultFont].LineSpacing <- 50
         loadAssets.textures.[BasePixel].SetData([|Color.White|])
         mainContext <- { spriteBatch = loadSpriteBatch; assets = loadAssets }
     
