@@ -22,7 +22,7 @@ module Stage =
         if v >= 1 then PushBlock
         if v >= 2 then AbyssAndGround
         if v >= 4 then Inventory
-        if v >= 7 then KeyAndDoor
+        if v >= 5 then KeyAndDoor
     ]
     
     let stageInventoryFlag (update: Update List) = List.contains Inventory update
@@ -104,7 +104,7 @@ module Stage =
 
     let drawObject (context: DrawContext) (object: ObjectType) (spec: AssetMap.AssetSpec) (pos: Vector2) (offset: Vector2) = 
         let textureID = AssetMap.ObjectTexture object spec
-        let someTexture = Map.tryFind textureID context.assets.textures
+        let someTexture = AssetMap.getTexture context textureID
         let pixel = Vector2(pos.X*float32 GameCore.BlockSize, pos.Y*float32 GameCore.BlockSize) + offset
         let idx = 
             match object with
@@ -205,9 +205,68 @@ module Stage =
                 drawCellInIteration context pos objects stage offset
         let movelist, time = stage.movement
         movelist |> List.iter (fun gmove -> drawObjectMove context gmove time stage offset)
+    
+    let inventoryRatio = (3, 2)
+    let inventoryCellSize = (GameCore.BlockSize*(fst inventoryRatio))/(snd inventoryRatio)
+    let focusCellSize = (GameCore.BlockSize*((fst inventoryRatio)*(fst inventoryRatio)))/((snd inventoryRatio)*(snd inventoryRatio))
+    let outerSize = inventoryCellSize + 32
+    let inventoryCellDistance = outerSize/2 + focusCellSize/2 + 8
+    let focusToCell = Vector2(float32 (focusCellSize - outerSize), float32 (focusCellSize - outerSize))/2.0f
+    let focusPos = Vector2(32.0f, GameCore.virtualScreenSize.Y - float32(focusCellSize + 32))
+
+    let celltoBlock = Vector2(16f, 16f)
+
+    let drawCell (context: DrawContext) (object: ObjectType) (idx: int) (offset: Vector2) = 
+        let textureID = AssetMap.ObjectTexture object AssetMap.NoSpec
+        let someTexture = AssetMap.getTexture context textureID
+        let cellPos = focusPos + focusToCell + Vector2(float32(idx*inventoryCellDistance), 0f) + offset
+        let objectPos = cellPos + celltoBlock
+        let coloridx = 
+            match object with
+            | Key idx -> idx
+            | Door idx -> idx
+            | _ -> 0
+        let defaultShape = AssetMap.getDefaultTexture context
+        let cellTexture = AssetMap.getTexture context Cell
+        let color = AssetMap.colorMap[coloridx]
+        let fade = Color(0, 0, 0, 192)
+        let pixScale = Vector2(float32 outerSize, float32 outerSize)
+        context.spriteBatch.Draw(defaultShape, cellPos, System.Nullable<Rectangle>(), fade, 0.0f, Vector2.Zero, pixScale, SpriteEffects.None, 0.0f)
+        match cellTexture with
+        | Some texture -> 
+            let scale = Vector2( float32 outerSize/float32 texture.Width, float32 outerSize/float32 texture.Height)
+            context.spriteBatch.Draw(texture, cellPos, System.Nullable<Rectangle>(), Color.White, 0.0f, Vector2.Zero, scale, SpriteEffects.None, 0.0f)
+        | None -> ()
+        match someTexture with
+        | Some texture ->
+            let scale = Vector2(float32 inventoryCellSize/float32 texture.Width, float32 inventoryCellSize/float32 texture.Height)
+            context.spriteBatch.Draw(texture, objectPos, System.Nullable<Rectangle>(), color, 0.0f, Vector2.Zero, scale, SpriteEffects.None, 0.0f)
+        | None when object = Empty -> ()
+        | None -> 
+            let scale = Vector2(float32 inventoryCellSize, float32 inventoryCellSize)
+            context.spriteBatch.Draw(defaultShape, objectPos, System.Nullable<Rectangle>(), color, 0.0f, Vector2.Zero, scale, SpriteEffects.None, 0.0f)
+
+    let drawFocus (context: DrawContext) (idx: int) (offset: Vector2) = 
+        let focusTexture = AssetMap.getTexture context Focus
+        match focusTexture with
+        | Some texture ->
+            let focusPos = focusPos + Vector2(float32(idx*inventoryCellDistance), 0f) + offset
+            let scale = Vector2(float32 focusCellSize/float32 texture.Width, float32 focusCellSize/float32 texture.Height)
+            context.spriteBatch.Draw(texture, focusPos, System.Nullable<Rectangle>(), Color.White, 0.0f, Vector2.Zero, scale, SpriteEffects.None, 0.0f)
+        | None -> ()
 
     let drawInventory (context: DrawContext) (stage: InStage) (offset: Vector2) = 
-        ()
+        if stage.inventoryFlag then
+            stage.inventory
+            |> Array.indexed
+            |> Array.iter (
+                fun (idx, object) ->
+                drawCell context object idx offset
+            )
+            let focusIdx = stage.selectedIdx
+            drawFocus context focusIdx offset
+    
+        
     
     let drawGame (context: DrawContext) (stage: InStage) (offset: Vector2) = 
         drawStage context stage (offset + screenCenter)

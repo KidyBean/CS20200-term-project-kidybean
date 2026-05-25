@@ -103,29 +103,20 @@ module StageObject =
             | Empty, Player | Empty, CanPush -> 
                 StageGrid.pushObjects pushBackObject prev stage.stageMap false
                 Passed (Set.empty, movableObject)
+            
+            | Empty, _ when not (Set.contains WrongObjectPushExploit patchList) -> 
+                StageGrid.pushObjects pushBackObject prev stage.stageMap false
+                Passed (Set [WrongObjectPushExploit], movableObject)
         
             | _, Player when not (Set.contains PlayerCollisionExploit patchList) -> 
                 StageGrid.pushObjects pushBackObject prev stage.stageMap false
                 Passed (Set [PlayerCollisionExploit], movableObject)
         
-            | _, CanPush when not (Set.contains ObjectCollisionExploit patchList) ->
+            | _, _ when not (Set.contains ObjectCollisionExploit patchList) ->
                 StageGrid.pushObjects pushBackObject prev stage.stageMap false
                 Passed (Set [ObjectCollisionExploit], movableObject)
         
-            | _, _ when not (Set.contains WrongObjectPushExploit patchList) -> 
-                StageGrid.pushObjects pushBackObject prev stage.stageMap false
-                Passed (Set [WrongObjectPushExploit], movableObject)
-        
             | _,  _ -> Blocked
-    
-    let moveClearOnPos (move: GameMove) (stage: InStage) = 
-        match move with
-        | ObjectMove (objects, _, endPos) ->
-            let posObjects = stage.stageMap |> StageGrid.objectOnPos endPos
-            let posRemain = Option.isSome ((|CanGoThrough|_|) posObjects[0])
-            let rawObjects = Array.append posObjects objects
-            StageGrid.pushObjects rawObjects endPos stage.stageMap posRemain
-        | _ -> ()
 
     
     let pullDownPos (pos: GridPosition) (stage: InStage) = 
@@ -136,26 +127,41 @@ module StageObject =
         | Abyss ->
             let targetObjects = stageMap |> StageGrid.objectOnPos pos
             if Set.contains WrongAbyssObjectExploit patchList then
+                let playerIdx = targetObjects |> Array.tryFindIndex (fun object -> object = Player)
+                let hasPlayer = Option.isSome playerIdx
                 let baseIdx = targetObjects |> Array.tryFindIndex (fun object -> Option.isSome ((|CanFillAbyss|_|) object))
                 match baseIdx with
                 | Some v  ->
-                    let remain = targetObjects[v + 1..]
+                    let remain = if hasPlayer && playerIdx.Value < v then Array.append [|Player|] targetObjects[v + 1..] else targetObjects[v + 1..]
                     let ground = targetObjects[v]
                     StageGrid.pushObjects remain pos stage.stageMap false
                     StageGrid.putObjectToGround ground pos stage.stageMap
                     Passed (Set.empty, ())
                 | None ->
-                    StageGrid.pushObjects [|Empty|] pos stage.stageMap false
+                    let remain = if hasPlayer then [|Player|] else [|Empty|]
+                    StageGrid.pushObjects remain pos stage.stageMap false
                     Passed (Set.empty, ())
             else
-                let remain = targetObjects[1..]
-                let ground = targetObjects[0]
+                let idx = if targetObjects[0] <> Player then 0 else 1
+                let remain = if idx = 0 then targetObjects[idx + 1..] else Array.append [|Player|] targetObjects[idx + 1..]
+                let ground = targetObjects[idx]
                 if ground = Empty then Passed (Set.empty, ())
                 else
                     StageGrid.pushObjects remain pos stage.stageMap false
                     StageGrid.putObjectToGround ground pos stage.stageMap
-                    Passed (Set [WrongAbyssObjectExploit], ())
-        | _ -> Blocked
+                    if Option.isSome ((|CanFillAbyss|_|) ground) then Passed (Set.empty, ())
+                    else Passed (Set [WrongAbyssObjectExploit], ())
+        | _ -> Passed (Set.empty, ())
+    
+    let moveClearOnPos (move: GameMove) (stage: InStage) = 
+        match move with
+        | ObjectMove (objects, _, endPos) ->
+            let posObjects = stage.stageMap |> StageGrid.objectOnPos endPos
+            let posRemain = Option.isSome ((|CanGoThrough|_|) posObjects[0])
+            let rawObjects = Array.append posObjects objects
+            StageGrid.pushObjects rawObjects endPos stage.stageMap posRemain
+            pullDownPos endPos stage
+        | _ -> Passed (Set.empty, ())
 
     let getObjectOnPos (pos: GridPosition) (stage: InStage) = 
         let stageMap = stage.stageMap
@@ -285,8 +291,7 @@ module StagePlayer =
                 else Passed (Set.empty, [||])
             match result with
             | Passed (err, objectList) ->
-                let result = 
-                    StageObject.moveToPos playerPos objectPos stage true
+                let result = StageObject.moveToPos playerPos objectPos stage true
                 match result with
                 | Passed (err2, objectList2) ->
                     if Array.isEmpty objectList then
@@ -299,7 +304,14 @@ module StagePlayer =
                     else
                         Passed (err, [ObjectMove ([||], playerPos, playerPos); ObjectMove (objectList, objectPos, objectAfterPos)])
                 | CrashRaised err -> CrashRaised err
-            | Blocked -> Blocked
+            | Blocked ->
+                if Set.contains PlayerCollisionExploit stage.patch then Blocked
+                else
+                    let result = StageObject.moveToPos playerPos objectPos stage true
+                    match result with
+                    | Passed (err, objectList2) -> Passed (err, [ObjectMove (objectList2, playerPos, objectPos)])
+                    | Blocked -> Blocked
+                    | CrashRaised err -> CrashRaised err
             | CrashRaised err -> CrashRaised err
 
 
@@ -518,7 +530,11 @@ module InStage =
     
     let updateByMovement (gameMove : GameMove list * float32) (stage: InStage)= 
         let movement, _ = gameMove
-        movement |> List.iter (fun move -> StageObject.moveClearOnPos move stage)
+        movement |> List.fold (fun err move -> 
+            match StageObject.moveClearOnPos move stage with
+            | Passed (errC, ()) -> Set.union err errC
+            | _ -> err
+        ) Set.empty
     
     let update (someAction: KeyBind option) (stage: InStage) (deltaTime: float32): InStage = 
         match stage.moveTime with
@@ -540,11 +556,12 @@ module InStage =
                     fullTimeSpent = stage.fullTimeSpent + deltaTime 
                 }
             else
-                updateByMovement stage.movement stage
+                let err = updateByMovement stage.movement stage
                 let realPos = StageGrid.gridPosToVector stage.playerPos
                 let cameraTarget = StageCore.cameraInRealPos realPos stage.cameraTarget stage
                 let cameraPos = StageCore.cameraTrace stage.cameraPos cameraTarget
                 { stage with 
+                    usedBug = Set.union err stage.usedBug
                     prevPlayerPos = stage.playerPos;
                     playerRealPos = realPos
                     cameraTarget = cameraTarget

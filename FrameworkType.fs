@@ -52,6 +52,8 @@ type TextureID =
     | ArrowR
     | Pause
     | Tuto
+    | Focus
+    | Cell
 
 module debug = 
     let UITextureReady = false
@@ -184,6 +186,8 @@ module AssetMap =
         ArrowR, Some "texture/ArrowR"
         Pause, Some "texture/Pause"
         Tuto, Some "texture/Tuto"
+        Focus, Some  "texture/Focus"
+        Cell, Some  "texture/Cell"
     ]
     
     let fontToAssetName = [
@@ -297,14 +301,30 @@ Our game has finally been released.
 
 Although this is our first beta version, our brilliant development team has made sure
 that the game is almost perfectly stable.".TrimStart('\r', '\n')
+
         PushBlock, "
 Block pushing has been added.
 
 Players can now push designated blocks within the stage.
 This feature should provide a stable and reliable gameplay experience.".TrimStart('\r', '\n')
-        AbyssAndGround, ""
-        Inventory, ""
-        KeyAndDoor, ""
+
+        AbyssAndGround, "
+Ground tiles have been added to stage.
+
+Players can now experience more varied stage terrain.
+This system has been carefully implemented for stable gameplay.".TrimStart('\r', '\n')
+
+        Inventory, "
+The inventory system has been added.
+
+Players can now collect and manage items during gameplay.
+All stored items should remain exactly where they are expected to be.".TrimStart('\r', '\n')
+
+        KeyAndDoor, "
+Keys and doors have been added.
+
+Players can now unlock doors using keys found within the stage.
+This feature should make progression more structured and reliable.".TrimStart('\r', '\n')
 
     ]
     let patchPromptMap = Map [
@@ -319,15 +339,46 @@ In rare cases, the player could leave the valid stage area,
 which may have caused the game to crash.
 Additional boundary checks have been added.".TrimStart('\r', '\n')
 
-        WrongObjectPushExploit, ""
-        ObjectCollisionExploit, ""
-        AbyssCheckExploit, ""
-        WrongAbyssObjectExploit, ""
-        WrongInventoryPutExploit, ""
-        InventoryLayerStackCrash, ""
-        PutDownOverlapExploit, ""
-        AnyKeyUsedExploit, ""
+        WrongObjectPushExploit, "
+A minor object pushing issue has been confirmed.
+In rare cases, blocks that were not intended to be movable could be pushed.
+Push validation has been corrected to preserve the intended stage design.".TrimStart('\r', '\n')
 
+        ObjectCollisionExploit, "
+A minor object collision issue has been reported.
+Under certain conditions, pushed blocks could ignore collision with other blocks.
+Object collision checks have been improved.".TrimStart('\r', '\n')
+
+        AbyssCheckExploit, "
+A minor abyss detection issue has been reported.
+In rare cases, falling into the abyss did not result in defeat.
+Abyss checks have been corrected to preserve the intended gameplay experience.".TrimStart('\r', '\n')
+
+        WrongAbyssObjectExploit, "
+A minor abyss interaction issue has been confirmed.
+In rare cases, objects not intended to fill the abyss could still create ground.
+Abyss object validation has been improved.".TrimStart('\r', '\n')
+
+        WrongInventoryPutExploit, "
+A minor inventory validation issue has been reported.
+In rare cases, objects not intended to be stored could be placed in the inventory.
+Inventory checks have been corrected.".TrimStart('\r', '\n')
+
+        InventoryLayerStackCrash, "
+A minor inventory capacity issue has been reported.
+In rare cases, the inventory could exceed its maximum capacity,
+which may have caused the game to crash.
+Inventory capacity checks have been added.".TrimStart('\r', '\n')
+
+        PutDownOverlapExploit, "
+A minor item placement issue has been confirmed.
+In rare cases, inventory items could be placed on already occupied tiles.
+Placement validation has been added to prevent unintended overlap.".TrimStart('\r', '\n')
+
+        AnyKeyUsedExploit, "
+A minor key validation issue has been reported.
+In rare cases, a door could be unlocked with a key meant for another door.
+Key-door matching has been corrected to preserve the intended progression.".TrimStart('\r', '\n')
     ]
     let updatePrompt (update: Update) = 
         match Map.tryFind update updatePromptMap with
@@ -349,13 +400,45 @@ Additional boundary checks have been added.".TrimStart('\r', '\n')
     let tutorial = "Tutorial"
     let tutorialMap = Map [
         Walk, "
-Move with W A S D and arrow key.
+Move with W A S D or the arrow keys.
 
 Press ESC to pause.
 
 Reach the flag to clear the stage.
 
 Avoid spikes. Touching them will kill you.".TrimStart('\r', '\n')
+
+        PushBlock, "
+Some blocks can be pushed.
+
+Move toward a pushable block to push it.
+
+Use blocks to create a path or clear the way.".TrimStart('\r', '\n')
+
+        AbyssAndGround, "
+The abyss is dangerous.
+
+Falling into the abyss will kill you.
+
+Some objects can fill the abyss and create new ground.".TrimStart('\r', '\n')
+
+        Inventory, "
+Some objects can be stored in your inventory.
+
+Press E to pick up an object.
+
+Press F to put it down.
+
+Press a number key to change inventory slots.".TrimStart('\r', '\n')
+
+        KeyAndDoor, "
+Keys can unlock doors.
+
+Each key only works with its matching door.
+
+Find the correct key to open the way forward.
+
+Walk into a door to unlock it with a key.".TrimStart('\r', '\n')
     ]
     let tutorialPrompt update = 
         match Map.tryFind update tutorialMap with
@@ -396,14 +479,14 @@ Avoid spikes. Touching them will kill you.".TrimStart('\r', '\n')
     let bugPromptMap = Map [
         PlayerCollisionExploit, "PLAYER COLLISION, "
         StagePositionOutCrash, "Unexpected Player Position: Out of Stage Boundary"
-        WrongObjectPushExploit, "1, "
-        ObjectCollisionExploit, "2, "
-        AbyssCheckExploit, "3, "
-        WrongAbyssObjectExploit, "4, "
-        WrongInventoryPutExploit, "5, "
+        WrongObjectPushExploit, "INVALID OBJECT PUSH, "
+        ObjectCollisionExploit, "OBJECT COLLISION, "
+        AbyssCheckExploit, "ABYSS BYPESS, "
+        WrongAbyssObjectExploit, "INVALID ABYSS FILL, "
+        WrongInventoryPutExploit, "INVALID INVENTORY STORAGE, "
         InventoryLayerStackCrash, "Unexpected Inventory Entity: Out of Inventory Boundary"
-        PutDownOverlapExploit, "6, "
-        AnyKeyUsedExploit, "7, "
+        PutDownOverlapExploit, "ITEM OVERLAP, "
+        AnyKeyUsedExploit, "INVALID KEY UNLOCK, "
     ]
 
     let exploitPrompt usedBug = 

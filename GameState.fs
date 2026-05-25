@@ -114,11 +114,12 @@ module GameState =
     let needUpdate (state: GameState) = state.needPatch
 
     let getPatch (stagenum: int) (state: GameState) = 
-        if Option.isSome (needUpdate state) then needUpdate state
-        else
-            let prevPatch = Map.tryFind (stagenum - 1) state.stagePatchList |> Option.defaultValue state.lastPatchList
-            Map.tryFind stagenum state.stagePatchList |> Option.defaultValue state.lastPatchList
-            |> Set.difference prevPatch 
+        match needUpdate state with
+        | Some patch -> Some patch
+        | None ->
+            let currentPatch = Map.tryFind stagenum state.stagePatchList |> Option.defaultValue state.lastPatchList
+            Map.tryFind (stagenum - 1) state.stagePatchList |> Option.defaultValue state.lastPatchList
+            |> Set.difference currentPatch
             |> Seq.tryHead
     
     let addPatchOnStage (state: GameState) = 

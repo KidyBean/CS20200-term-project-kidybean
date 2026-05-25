@@ -567,7 +567,9 @@ module ScreenMapBase =
             Some action, change
         | _ -> None, []
     let PatchNoteHandler (state: GameState) () =
-        None, GameState.setLastUpdate state
+        let change = GameState.setLastUpdate state
+        if List.isEmpty change then None, []
+        else Some UI.Blocked, change
     
     let PatchNoteScreen (state: GameState): UI.ScreenUI = 
         let popUp = List.head PatchNoteBase.subscreens
@@ -960,7 +962,7 @@ module ScreenMapBase =
     let TutorialHandler (state: GameState) () =
         None, []
     let TutorialScreen (state: GameState) = 
-        let popUp = List.head PatchNoteBase.subscreens
+        let popUp = List.head TutorialBase.subscreens
         let stagenum = GameState.getPresentStage state
         let horizontal = 0.1f
         let upperRatio = (0.06f, 0.2f)
