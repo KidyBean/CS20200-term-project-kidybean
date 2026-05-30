@@ -1,0 +1,5 @@
+*.sh text eol=lf
+*.bat text eol=crlf
+*.fs text eol=crlf
+*.fsproj text eol=crlf
+*.md text eol=crlf
