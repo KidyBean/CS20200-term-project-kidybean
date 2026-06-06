@@ -12,6 +12,8 @@ The player controls a character in each stage and tries to reach the goal. Each 
   Verify with: `dotnet --version` (should show `10.x.x`)
 * MonoGame content tools
   These can be restored with `dotnet tool restore`.
+* To avoid build issues, the full project path must contain only ASCII characters.
+  Please do not place the project inside folders whose names contain Korean or other non-ASCII characters.
 
 ### Run
 ```bash
